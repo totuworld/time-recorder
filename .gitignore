@@ -4,6 +4,7 @@
 .idea
 **/node_modules/*
 **/.firebaserc
+.firebaserc
 
 ### Node ###
 # Logs
