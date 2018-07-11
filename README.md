@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/totuworld/time-recorder.svg?branch=master)](https://travis-ci.org/totuworld/time-recorder)
+
 # Time Recorder
 
 Time Recorder는 firebase를 활용해서 작업 시간을 기록하기 위해서 만들어진 slack app용 백엔드 functions의 모음이다.
