@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import * as admin from "firebase-admin";
 
 import { Util } from './util';
+import { access } from 'fs';
 
 const SLACK_ACTION_REQUEST_PING = "ping-pong";
 
@@ -19,6 +20,13 @@ enum EN_WORK_TITLE_KR {
   REST = '휴식',
   EMERGENCY = '긴급대응',
   DONE = '완료',
+}
+
+const commandSet = {
+  WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
+  BYEBYE: new Set(['퇴근', 'ㅌㄱ', 'bye']),
+  REST: new Set(['휴식', 'ㅎㅅ', 'rest', 'etc']),
+  DONE: new Set(['완료', 'ㅇㄹ', 'done']),
 }
 
 const config = functions.config().fbconf;
@@ -47,7 +55,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
   const userRootRef = admin.database().ref('user');
   const userRef = userRootRef.child(command.user_id);
   // 출근
-  if (command.text === '출근' || command.text === 'ㅊㅊ' || command.text === 'ㅊㄱ') {
+  if (commandSet.WORK.has(command.text) === true) {
     const time = Util.currentTimeStamp();
     const refKey = await workRef.push({
       user: command.user_id,
@@ -61,7 +69,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
   }
 
   // 퇴근
-  if (command.text === '퇴근' || command.text === 'ㅌㄱ' || command.text === 'bye') {
+  if (commandSet.BYEBYE.has(command.text) === true) {
     const time = Util.currentTimeStamp();
     const refKey = await workRef.push({
       user: command.user_id,
@@ -75,7 +83,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
   }
   
   // 휴식
-  if (command.text === '휴식' || command.text === 'ㅎㅅ' || command.text === 'rest' || command.text === 'etc') {
+  if (commandSet.REST.has(command.text) === true) {
     const time = Util.currentTimeStamp();
     const refKey = await workRef.push({
       user: command.user_id,
@@ -89,7 +97,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
   }
 
   // 완료
-  if (command.text === '완료' || command.text === 'ㅇㄹ' || command.text === 'done') {
+  if (commandSet.DONE.has(command.text) === true) {
     const time = Util.currentTimeStamp();
     const logDatas = await userRef.child(`${Util.currentDate()}`).once("value").then(snap => {
       const childData = snap.val() as { [key: string]: LogData };
@@ -180,6 +188,76 @@ export const command_ping = functions.https.onRequest(async (request, response) 
     ]
   });
 });
+
+export const command_history = functions.https.onRequest(async (request, response) => {
+  if (request.method !== "POST") {
+      console.error(`Got unsupported ${request.method} request. Expected POST.`);
+      return response.status(405).send("Only POST requests are accepted");
+  }
+
+  const command = request.body as SlackSlashCommand;
+  // console.log(command);
+
+  const userRootRef = admin.database().ref('user');
+  const userRef = userRootRef.child(command.user_id);
+  const logDatas = await userRef.child(`${Util.currentDate()}`).once("value").then(snap => {
+    const childData = snap.val() as { [key: string]: LogData };
+
+    // 일한 시간 뽑아내자.
+    // 출/퇴근 필터
+    const workFilter = Object.keys(childData)
+      .filter((fv) => childData[fv].type === EN_WORK_TYPE.WORK || childData[fv].type === EN_WORK_TYPE.BYEBYE)
+      .map(mv => { return childData[mv] })
+      .reduce(
+        (acc: { acc: number, lastWorkTimeStamp: string }, cur: LogData) => {
+          // 출근인가?
+          if (cur.type === EN_WORK_TYPE.WORK) {
+            acc.lastWorkTimeStamp = cur.time;
+          }
+          // 퇴근인가?
+          if (cur.type === EN_WORK_TYPE.BYEBYE) {
+            if (!!acc.lastWorkTimeStamp) {
+              // 앞 시간부터 비교해서 시간 추가하자.
+              const duration = Util.getBetweenDuration(acc.lastWorkTimeStamp, cur.time);
+              acc.acc += duration.as('hours');
+            }
+          }
+          return acc;
+        },
+        {
+          acc: 0,
+          lastWorkTimeStamp: null,
+        });
+    // 출근은 찍혔지만 퇴근 기록이 없는가?
+    const noBye = !!workFilter.lastWorkTimeStamp && workFilter.acc === 0;
+    if (noBye === true)  {
+      const current = Util.currentTimeStamp();
+      const duration = Util.getBetweenDuration(workFilter.lastWorkTimeStamp, current);
+      workFilter.acc += duration.as('hours');
+    }
+    return {
+      ...workFilter,
+      rawData: childData,
+      noBye,
+    };
+  });
+  // log time 찍기.
+  const message = [logDatas.acc > 0 ? `워킹타임: ${logDatas.acc} 시간 기록중!` : '오늘은 휴가인가봐요 :)'];
+  const keyLength = Object.keys(logDatas.rawData).length;
+  if (keyLength > 0) {
+    Object.keys(logDatas.rawData).map((key) => {
+      const data = logDatas.rawData[key];
+      const done = !!data.done ? ` ~ ${Util.toDateTimeShort(data.done)}` : '';
+      message.push(
+        `${EN_WORK_TITLE_KR[data.type]} 👉 ${Util.toDateTimeShort(data.time)}${done}`
+      );
+    });
+  }
+  return response.contentType("json").status(200).send({
+    text: message.join('\n\n'),
+  });
+});
+
 
 export const message_action = functions.https.onRequest(async (request, response) => {
   if (request.method !== "POST") {

@@ -11,6 +11,10 @@ export class Util {
     const time = luxon.DateTime.local();
     return time.setLocale('ko-kr').setZone('Asia/Seoul').toLocaleString(luxon.DateTime.DATETIME_SHORT);
   }
+  static toDateTimeShort(timeStr: string) {
+    const time = luxon.DateTime.fromISO(timeStr);
+    return time.setLocale('ko-kr').setZone('Asia/Seoul').toLocaleString(luxon.DateTime.DATETIME_SHORT);
+  }
   static currentTimeStamp() {
     const time = luxon.DateTime.utc();
     return time.toISO();
