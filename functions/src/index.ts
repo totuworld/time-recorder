@@ -1,26 +1,12 @@
 import * as functions from 'firebase-functions';
-import * as admin from "firebase-admin";
 
 import { Util } from './util';
-import { access } from 'fs';
+import { FireabaseAdmin } from './services/FirebaseAdmin';
+import { WorkLog } from './models/WorkLog';
+import { EN_WORK_TYPE, EN_WORK_TITLE_KR } from './contants/enum/EN_WORK_TYPE';
+import { SlackSlashCommand, LogData, SlackActionInvocation } from './models/interface/SlackSlashCommand';
 
 const SLACK_ACTION_REQUEST_PING = "ping-pong";
-
-enum EN_WORK_TYPE {
-  WORK = 'WORK',
-  BYEBYE = 'BYEBYE',
-  REST = 'REST',
-  EMERGENCY = 'EMERGENCY',
-  DONE = 'DONE',
-}
-
-enum EN_WORK_TITLE_KR {
-  WORK = '출근',
-  BYEBYE = '퇴근',
-  REST = '휴식',
-  EMERGENCY = '긴급대응',
-  DONE = '완료',
-}
 
 const commandSet = {
   WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
@@ -28,12 +14,6 @@ const commandSet = {
   REST: new Set(['휴식', 'ㅎㅅ', 'rest', 'etc']),
   DONE: new Set(['완료', 'ㅇㄹ', 'done']),
 }
-
-const config = functions.config().fbconf;
-
-admin.initializeApp({
-  databaseURL: config.databaseurl,
-  credential: admin.credential.cert(config.credential)});
 
 // // Start writing Firebase Functions
 // // https://firebase.google.com/docs/functions/typescript
@@ -50,19 +30,9 @@ export const command_ping = functions.https.onRequest(async (request, response) 
 
   const command = request.body as SlackSlashCommand;
   // console.log(command);
-
-  const workRef = admin.database().ref('work');
-  const userRootRef = admin.database().ref('user');
-  const userRef = userRootRef.child(command.user_id);
   // 출근
   if (commandSet.WORK.has(command.text) === true) {
-    const time = Util.currentTimeStamp();
-    const refKey = await workRef.push({
-      user: command.user_id,
-      log: EN_WORK_TYPE.WORK,
-      time: time,
-    });
-    await userRef.child(`${Util.currentDate()}`).push({ refKey: refKey.key, time, type: EN_WORK_TYPE.WORK });
+    await WorkLog.storeWork({userId: command.user_id});
     return response.contentType("json").status(200).send({
       text: Util.hiMsg(),
     });
@@ -70,13 +40,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
 
   // 퇴근
   if (commandSet.BYEBYE.has(command.text) === true) {
-    const time = Util.currentTimeStamp();
-    const refKey = await workRef.push({
-      user: command.user_id,
-      log: EN_WORK_TYPE.BYEBYE,
-      time: time,
-    });
-    await userRef.child(`${Util.currentDate()}`).push({ refKey: refKey.key, time, type: EN_WORK_TYPE.BYEBYE });
+    await WorkLog.storeBye({userId: command.user_id});
     return response.contentType("json").status(200).send({
       text: Util.byeMsg(),
     });
@@ -84,13 +48,7 @@ export const command_ping = functions.https.onRequest(async (request, response) 
   
   // 휴식
   if (commandSet.REST.has(command.text) === true) {
-    const time = Util.currentTimeStamp();
-    const refKey = await workRef.push({
-      user: command.user_id,
-      log: EN_WORK_TYPE.REST,
-      time: time,
-    });
-    await userRef.child(`${Util.currentDate()}`).push({ refKey: refKey.key, time, type: EN_WORK_TYPE.REST });
+    await WorkLog.storeRest({userId: command.user_id});
     return response.contentType("json").status(200).send({
       text: `휴식 ${Util.dateTimeShort()}`,
     });
@@ -98,43 +56,14 @@ export const command_ping = functions.https.onRequest(async (request, response) 
 
   // 완료
   if (commandSet.DONE.has(command.text) === true) {
-    const time = Util.currentTimeStamp();
-    const logDatas = await userRef.child(`${Util.currentDate()}`).once("value").then(snap => {
-      const childData = snap.val() as { [key: string]: LogData };
-      const filter = Object.keys(childData)
-        .reduce((acc: LogData & { key: string }[], key) => {
-          const fv = childData[key] as LogData & { key: string };
-          fv['key'] = key; // 키 저장.
-          // REST, EMERGENCY 중 done이 없는 것 추출
-          if ((fv.type === EN_WORK_TYPE.REST || fv.type === EN_WORK_TYPE.EMERGENCY) && !!fv.done === false) {
-            acc.push(fv);
-          }
-          return acc;
-        }, []);
-      return filter;
-    });
-    if (logDatas.length === 0) {
-      // 딱히 완료할 잡이 없다.
-      return response.contentType("json").status(200).send({
-        text: `완료처리할 이벤트가 없어요`,
-      });
-    }
-    const updateData = logDatas[logDatas.length - 1];
-
-    const duration = Util.getBetweenDuration(updateData.time, time).toObject();
-    const durationStr = Object.keys(duration).map((key) => `${duration[key]} ${key}`).join(' ');
-    const msg = `${EN_WORK_TITLE_KR[updateData.type]} 완료 (소요: ${durationStr})`;
-
-    updateData.done = time;
-    userRef.child(`${Util.currentDate()}`).child(updateData.key).set(updateData);
-
+    const { msg } = await WorkLog.storeComplete({userId: command.user_id});
     return response.contentType("json").status(200).send({
       text: msg,
     });
   }
 
   // Handle the commands later, Slack expect this request to return within 3000ms
-  // await admin.database().ref("commands/ping").push(command);
+  // await FirebaseAmdin.Database.ref("commands/ping").push(command);
 
   return response.contentType("json").status(200).send({
     "text": "기록을 시작할까요?",
@@ -198,7 +127,7 @@ export const command_history = functions.https.onRequest(async (request, respons
   const command = request.body as SlackSlashCommand;
   // console.log(command);
 
-  const userRootRef = admin.database().ref('user');
+  const userRootRef = FireabaseAdmin.Database.ref('user');
   const userRef = userRootRef.child(command.user_id);
   const logDatas = await userRef.child(`${Util.currentDate()}`).once("value").then(snap => {
     const childData = snap.val() as { [key: string]: LogData };
@@ -258,6 +187,17 @@ export const command_history = functions.https.onRequest(async (request, respons
   });
 });
 
+export const get_all = functions.https.onRequest(async (request, response) => {
+  const userId = request.query['userId'];
+  const startDate = request.query['startDate'];
+  const endDate = request.query['endDate'];
+  if (!!userId === false) {
+    response.status(400).contentType('json').send([]);
+  } else {
+    const resp = await WorkLog.findAll({ userId, startDate, endDate });
+    response.contentType("json").send(resp);
+  }
+});
 
 export const message_action = functions.https.onRequest(async (request, response) => {
   if (request.method !== "POST") {
@@ -289,8 +229,8 @@ export const message_action = functions.https.onRequest(async (request, response
   */
 
   // TODO: actions의 value를 보고 기록을 시작하자.
-  const workRef = admin.database().ref('work');
-  const userRootRef = admin.database().ref('user');
+  const workRef = FireabaseAdmin.Database.ref('work');
+  const userRootRef = FireabaseAdmin.Database.ref('user');
   const userRef = userRootRef.child(action.user.id);
   // 출근?
   if (action.actions[0].value === EN_WORK_TYPE.WORK) {
@@ -372,51 +312,3 @@ export const message_action = functions.https.onRequest(async (request, response
 
   return response.contentType("json").status(200).send('완료');
 });
-
-interface SlackSlashCommand {
-  token: string,
-  team_id: string,
-  team_domain: string,
-  channel_id: string,
-  channel_name: string,
-  user_id: string,
-  user_name: string,
-  command: string,
-  text: string,
-  response_url: string
-}
-
-interface SlackAction {
-  name: string,
-  type: string,
-  value: string
-}
-
-interface SlackActionInvocation {
-  actions: SlackAction[],
-  callback_id: string,
-  team: { id: string, domain: string },
-  channel: { id: string, name: string },
-  user: { id: string, name: string },
-  action_ts: string,
-  message_ts: string,
-  attachment_id: string,
-  token: string,
-  is_app_unfurl: boolean,
-  response_url: string,
-  original_message: {
-      text: string,
-      bot_id: string,
-      attachments?: any,
-      type: string,
-      subtype: string,
-      ts: string
-  }
-}
-
-interface LogData {
-  refKey: string,
-  time: string,
-  type: EN_WORK_TYPE,
-  done?: string,
-}

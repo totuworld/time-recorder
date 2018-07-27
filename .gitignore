@@ -5,7 +5,7 @@
 **/node_modules/*
 **/.firebaserc
 .firebaserc
-**/functions/lib/*
+functions/lib/
 
 ### Node ###
 # Logs
