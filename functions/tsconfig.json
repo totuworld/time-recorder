@@ -6,10 +6,17 @@
     "outDir": "lib",
     "sourceMap": true,
     "target": "es6",
+    "experimentalDecorators": true,
     "resolveJsonModule": true,
+    "esModuleInterop": true,
   },
-  "compileOnSave": true,
-  "include": [
-    "src"
-  ]
+  "exclude": [
+    "node_modules",
+    "build",
+    "scripts",
+    "acceptance-tests",
+    "webpack",
+    "jest"
+  ],
+  "types": ["typePatches", "node", "webpack-env"]
 }
