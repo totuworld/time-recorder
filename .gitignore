@@ -6,6 +6,7 @@
 **/.firebaserc
 .firebaserc
 functions/lib/
+functions/dist/
 
 ### Node ###
 # Logs

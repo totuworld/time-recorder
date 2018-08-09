@@ -10,7 +10,17 @@ class FireabaseAdminType {
   }
 
   bootstrap() {
-    const config = functions.config().fbconf;
+    let config = functions.config().fbconf;
+    if (!!config === false) {
+      config = {
+        databaseurl: process.env.databaseurl,
+        credential: {
+          privateKey: process.env.privateKey.replace(/\\n/g, '\n'),
+          clientEmail: process.env.clientEmail,
+          projectId: process.env.projectId,
+        }
+      }
+    }
 
     admin.initializeApp({
       databaseURL: config.databaseurl,

@@ -1,4 +1,5 @@
 import * as luxon from 'luxon';
+import * as uuid from 'uuid';
 
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from '../contants/enum/EN_WORK_TYPE';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
@@ -75,13 +76,15 @@ export class WorkLogType {
     return { msg };
   }
 
+  getRefKey() {
+    return {
+      key: `${luxon.DateTime.local().toFormat('yyyyLLLddHHmmss')}${uuid.v4().toLocaleLowerCase()}`,
+    };
+  }
+
   async store({ userId, type }: IWorkLogRequest & { type: EN_WORK_TYPE }) {
     const time = Util.currentTimeStamp();
-    const refKey = await this.Work.push({
-      user: userId,
-      log: type,
-      time: time
-    });
+    const refKey = this.getRefKey();
     const userRef = this.UserRef(userId);
     await userRef
       .child(`${Util.currentDate()}`)
@@ -103,6 +106,9 @@ export class WorkLogType {
     const userRef = this.UserRef(userId);
     const snap = await userRef.once("value");
     const updateValue = snap.val() as { [key: string]: { [key: string]: LogData } };
+    if (!!updateValue === false) {
+      return [];
+    }
     // 일정 안에 들어오는 정보를 필터링해서 내보낸다.
     const start = luxon.DateTime.fromISO(startDate);
     const end = luxon.DateTime.fromISO(endDate);

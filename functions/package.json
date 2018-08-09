@@ -1,24 +1,33 @@
 {
   "name": "functions",
+  "version": "0.1.0",
   "scripts": {
     "lint": "tslint --project tsconfig.json",
     "build": "tsc",
     "serve": "npm run build && firebase serve --only functions",
     "shell": "npm run build && firebase functions:shell",
-    "start": "npm run shell",
+    "start:function": "npm run shell",
+    "start": "NODE_ENV=production node lib/server.js",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "main": "lib/index.js",
   "dependencies": {
+    "body-parser": "^1.18.3",
+    "debug": "^3.1.0",
+    "dotenv": "^6.0.0",
     "express": "^4.16.3",
     "firebase-admin": "~5.12.1",
     "firebase-functions": "^1.0.3",
-    "luxon": "^1.3.1"
+    "luxon": "^1.3.1",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
+    "@types/debug": "0.0.30",
     "@types/express": "^4.16.0",
     "@types/luxon": "^1.2.1",
+    "@types/uuid": "^3.4.3",
+    "shelljs": "^0.8.2",
     "ts-node": "^7.0.0",
     "tslint": "^5.8.0",
     "typescript": "^2.5.3"

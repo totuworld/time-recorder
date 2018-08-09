@@ -20,8 +20,11 @@ export class Util {
     return time.toISO();
   }
   static currentDate() {
+    return this.currentDateWithFormat('yyyyLLdd')
+  }
+  static currentDateWithFormat(format: string) {
     const time = luxon.DateTime.local();
-    return time.setLocale('ko-kr').setZone('Asia/Seoul').toFormat('yyyyLLdd');
+    return time.setLocale('ko-kr').setZone('Asia/Seoul').toFormat(format);
   }
   static getBetweenDuration(a: string, b: string) {
     const aTime = luxon.DateTime.fromISO(a);
