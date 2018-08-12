@@ -18,6 +18,10 @@ export class UsersType {
       const rootRef = FireabaseAdmin.Database.ref("users");
       return rootRef;
     }
+    get LoginUsersRoot() {
+      const rootRef = FireabaseAdmin.Database.ref("login_users");
+      return rootRef;
+    }
     async groupMemberList({ groupId }: { groupId: string }) {
       const groups = this.GroupRoot.child(groupId);
       const snap = await groups.once('value');
@@ -51,6 +55,38 @@ export class UsersType {
       });
       const userInfos = Promise.all(promises);
       return userInfos;
+    }
+
+    async addLoginUser({ userUid, email }: { userUid: string, email: string }) {
+      // 전체 사용자 목록 조회.
+      const users = await this.UsersRoot.once('value');
+      const childData = users.val() as { [key:string]: IUserInfo };
+
+      // 사용자 정보가 있는지 확인.
+      let findUser: IUserInfo | null = null;
+      Object.keys(childData).forEach((key: string) => {
+        const fv = childData[key];
+        if (fv.email === email) {
+          findUser = fv;
+        }
+      });
+
+      // 사용자가 찾아졌나?
+      if (!!findUser) {
+        const loginUserRef = this.LoginUsersRoot.child(userUid);
+        await loginUserRef.set({
+          email,
+          id: findUser.id,
+        });
+        return {
+          result: true,
+          userKey: findUser.id,
+        };
+      }
+      return {
+        result: false,
+        userKey: null,
+      }
     }
 }
 

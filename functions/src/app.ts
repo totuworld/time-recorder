@@ -5,6 +5,7 @@ import { commandPing, commandHistory, getAll, messageAction, getGroups, getUser 
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Util } from './util';
 import * as bodyParser from 'body-parser';
+import { Users } from './models/Users';
 
 
 const app = express();
@@ -28,6 +29,15 @@ function routeList() {
   router.get('/get_groups', getGroups);
   router.get('/get_user', getUser);
   router.post('/message_action', messageAction);
+  router.post('/add_login_user', async (req, res) => {
+    const userUid = req.body['userUid'];
+    const email = req.body['email'];
+    if (!!userUid === false || !!email === false) {
+      return res.status(400);
+    }
+    const addResult = await Users.addLoginUser({userUid, email});
+    return res.send({ ...addResult });
+  });
   return router;
 }
 

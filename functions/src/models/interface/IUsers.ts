@@ -10,4 +10,5 @@ export interface IUsersItem {
 
 export interface IUserInfo extends IUsersItem {
   profile_url: string;
+  email: string;
 }
