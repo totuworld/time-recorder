@@ -9,7 +9,8 @@ const commandSet = {
   WORK: new Set(["출근", "ㅊㄱ", "ㅊㅊ", "hi"]),
   BYEBYE: new Set(["퇴근", "ㅌㄱ", "bye"]),
   REST: new Set(["휴식", "ㅎㅅ", "rest", "etc"]),
-  DONE: new Set(["완료", "ㅇㄹ", "done"])
+  DONE: new Set(["완료", "ㅇㄹ", "done"]),
+  EMERGENCY: new Set(["긴급대응", 'ㄱㄱㄷㅇ', 'emergency']),
 };
 
 const SLACK_ACTION_REQUEST_PING = "ping-pong";
@@ -54,6 +55,17 @@ export async function commandPing (request, response) {
       .status(200)
       .send({
         text: `휴식 ${Util.dateTimeShort()}`
+      });
+  }
+
+  // 긴급대응
+  if (commandSet.EMERGENCY.has(command.text) === true) {
+    await WorkLog.storeEmergency({ userId: command.user_id });
+    return response
+      .contentType("json")
+      .status(200)
+      .send({
+        text: `긴급대응 ${Util.dateTimeShort()}`
       });
   }
 
@@ -350,6 +362,25 @@ trigger_id: '397118842807.7909278821.7d4790b60fe730f2c4fa229e75848497' }
       .status(200)
       .send({
         text: `휴식 ${Util.dateTimeShort()}`
+      });
+  }
+
+  // 긴급대응
+  if (action.actions[0].value === EN_WORK_TYPE.EMERGENCY) {
+    const time = Util.currentTimeStamp();
+    const refKey = await workRef.push({
+      user: action.user.id,
+      log: EN_WORK_TYPE.EMERGENCY,
+      time: time
+    });
+    await userRef
+      .child(`${Util.currentDate()}`)
+      .push({ refKey: refKey.key, time, type: EN_WORK_TYPE.EMERGENCY });
+    return response
+      .contentType("json")
+      .status(200)
+      .send({
+        text: `긴급대응 ${Util.dateTimeShort()}`
       });
   }
 

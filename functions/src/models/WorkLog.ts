@@ -42,6 +42,10 @@ export class WorkLogType {
   async storeRest({ userId }: IWorkLogRequest) {
     await this.store({ userId, type: EN_WORK_TYPE.REST });
   }
+  /** 긴급대응 기록 */
+  async storeEmergency({ userId }: IWorkLogRequest) {
+    await this.store({ userId, type: EN_WORK_TYPE.EMERGENCY });
+  }
   /** 완료 기록 */
   async storeComplete({ userId }: IWorkLogRequest): Promise<{ msg: string }> {
     const time = Util.currentTimeStamp();
