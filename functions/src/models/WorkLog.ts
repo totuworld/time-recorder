@@ -47,10 +47,11 @@ export class WorkLogType {
     await this.store({ userId, type: EN_WORK_TYPE.EMERGENCY });
   }
   /** 완료 기록 */
-  async storeComplete({ userId }: IWorkLogRequest): Promise<{ msg: string }> {
+  async storeComplete({ userId, targetDate }: IWorkLogRequest & { targetDate?: string }): Promise<{ msg: string }> {
     const time = Util.currentTimeStamp();
     const userRef = this.UserRef(userId);
-    const logDatas = await userRef.child(`${Util.currentDate()}`).once("value").then(snap => {
+    const date = !!targetDate ? targetDate : Util.currentDate(); 
+    const logDatas = await userRef.child(date).once("value").then(snap => {
       const childData = snap.val() as { [key: string]: LogData };
       const filter = Object.keys(childData)
         .reduce((acc: LogData & { key: string }[], key) => {
@@ -75,7 +76,7 @@ export class WorkLogType {
     const msg = `${EN_WORK_TITLE_KR[updateData.type]} 완료 (소요: ${durationStr})`;
 
     updateData.done = time;
-    userRef.child(`${Util.currentDate()}`).child(updateData.key).set(updateData);
+    userRef.child(date).child(updateData.key).set(updateData);
 
     return { msg };
   }
@@ -86,16 +87,17 @@ export class WorkLogType {
     };
   }
 
-  async store({ userId, type, timeStr }: IWorkLogRequest & { type: EN_WORK_TYPE, timeStr?: string }) {
+  async store({ userId, type, timeStr, targetDate }: IWorkLogRequest & { type: EN_WORK_TYPE, timeStr?: string, targetDate?: string }) {
     const time = !!timeStr ? timeStr : Util.currentTimeStamp();
+    const childKey = !!targetDate? targetDate: Util.currentDate();
     const refKey = this.getRefKey();
     const userRef = this.UserRef(userId);
     await userRef
-      .child(`${Util.currentDate()}`)
+      .child(childKey)
       .push({ refKey: refKey.key, time, type });
   }
 
-  async updateData({ userId, updateDate, updateRecordkey, updateDataKey, updateTime }: IWorkLogRequest & { updateRecordkey: string, updateDataKey: keyof LogData , updateDate: string, updateTime: string }) {
+  async updateData({ userId, updateDate, updateRecordkey, updateDataKey, updateTime }: IWorkLogRequest & { updateRecordkey: string, updateDataKey: keyof LogData, updateDate: string, updateTime: string }) {
     const userRef = this.UserRef(userId);
     const targetRef = userRef.child(updateDate).child(updateRecordkey).child(updateDataKey);
     const resp = await targetRef.set(updateTime);

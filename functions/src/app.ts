@@ -3,7 +3,7 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import {
-    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify
+    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -15,6 +15,7 @@ app.disable('x-powered-by');
 function routeList() {
   const router = express.Router();
   router.post('/command_ping', commandPing);
+  router.post('/work_log', addWorkLog);
   router.post('/command_history', commandHistory);
   router.all('/return_log', (req, res) => {
     const command = req.body as SlackSlashCommand;

@@ -140,6 +140,49 @@ export async function commandPing (request, response) {
     });
 }
 
+/** 관리자용 */
+export async function addWorkLog (request, res) {
+  const {
+    ...reqData
+  }: {
+    auth_user_id: string,
+    user_id: string,
+    type: EN_WORK_TYPE,
+    target_date?: string,
+    time?: string,
+  }
+  = request.body;
+
+  // 로그인 사용자 확인
+  const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
+  if (authInfo.result === false) {
+    return res.status(401).send('unauthorized');
+  }
+
+  // 다른 유저의 log를 추가하는가?
+  if (authInfo.data.id !== reqData.user_id && !!authInfo.data.auth === false) {
+    return res.status(401).send('unauthorized');
+  }
+
+  // 완료 기록인가?
+  if (reqData.type === EN_WORK_TYPE.DONE) {
+    await WorkLog.storeComplete({
+      userId: reqData.user_id,
+      targetDate: reqData.target_date,
+    });
+  } else {
+    // 완료 외의 기록
+    await WorkLog.store({
+      userId: reqData.user_id,
+      type: reqData.type,
+      timeStr: reqData.time,
+      targetDate: reqData.target_date,
+    });
+  }
+  
+  return res.send();
+}
+
 export async function commandHistory(request, response) {
   if (request.method !== "POST") {
     console.error(
