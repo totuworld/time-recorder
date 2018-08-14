@@ -1,5 +1,5 @@
 import { FireabaseAdmin } from "../services/FirebaseAdmin";
-import { IUsers, IUserInfo } from "./interface/IUsers";
+import { IUsers, IUserInfo, ILoginUserInfo } from "./interface/IUsers";
 
 export class UsersType {
   constructor() {
@@ -86,6 +86,22 @@ export class UsersType {
       return {
         result: false,
         userKey: null,
+      }
+    }
+
+    async findLoginUser({ userUid }: { userUid: string }) {
+      const loginUserRef = this.LoginUsersRoot.child(userUid);
+      const snap = await loginUserRef.once('value');
+      const findUser = snap.val() as ILoginUserInfo;
+      if (!!findUser) {
+        return {
+          result: true,
+          data: {...findUser},
+        };
+      }
+      return {
+        result: false,
+        data: null,
       }
     }
 }

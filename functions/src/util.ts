@@ -19,6 +19,10 @@ export class Util {
     const time = luxon.DateTime.utc();
     return time.toISO();
   }
+  static formatStrToDateTime(date: string, format: string) {
+    const time = luxon.DateTime.fromFormat(date, format).toUTC();
+    return time;
+  }
   static currentDate() {
     return this.currentDateWithFormat('yyyyLLdd')
   }

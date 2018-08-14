@@ -4,6 +4,7 @@ import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
 import { Users } from './models/Users';
+import { auth } from '../node_modules/firebase-admin';
 
 const commandSet = {
   WORK: new Set(["출근", "ㅊㄱ", "ㅊㅊ", "hi"]),
@@ -233,6 +234,37 @@ export async function commandHistory(request, response) {
     .send({
       text: message.join("\n\n")
     });
+}
+
+export async function modify(request, res) {
+  if (request.method !== "POST") {
+    console.error(
+      `Got unsupported ${request.method} request. Expected POST.`
+    );
+    return res.status(405).send("Only POST requests are accepted");
+  }
+  const { auth_user_id, user_id, update_date, record_key , target_key, time } = request.body;
+
+  // 권한 확인
+  const authInfo = await Users.findLoginUser({ userUid: auth_user_id });
+  if (authInfo.result === false) {
+    return res.status(401).send('unauthorized');
+  }
+  
+  // 다른 유저의 정보를 수정하는가?
+  if (authInfo.data.id !== user_id && !!authInfo.data.auth === false) {
+    return res.status(401).send('unauthorized');
+  }
+  const updateData = {
+    userId: user_id,
+    updateDate: update_date,
+    updateRecordkey: record_key,
+    updateDataKey: target_key,
+    updateTime: time,
+  };
+  // 데이터 수정
+  await WorkLog.updateData(updateData);
+  return res.send();
 }
 
 export async function getAll(request, response) {
