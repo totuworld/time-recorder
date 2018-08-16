@@ -74,10 +74,19 @@ export class UsersType {
       // 사용자가 찾아졌나?
       if (!!findUser) {
         const loginUserRef = this.LoginUsersRoot.child(userUid);
-        await loginUserRef.set({
-          email,
-          id: findUser.id,
-        });
+        const snap = await loginUserRef.once("value");
+        const updateValue = snap.val() as ILoginUserInfo;
+        if (!!updateValue === false) {
+          await loginUserRef.set({
+            email,
+            id: findUser.id,
+          });
+        } else {
+          await loginUserRef.update({
+            email,
+            id: findUser.id,
+          });
+        }
         return {
           result: true,
           userKey: findUser.id,
