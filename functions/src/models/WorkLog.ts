@@ -133,20 +133,113 @@ export class WorkLogType {
 
   async find({ userId, startDate }: IWorkLogRequest & IWorkLogFindRequest) {
     // startDate가 validate에 실패하면 요청한 날짜를 기준으로 한다.
-    const updateStartDate = !!startDate && this.validateDateString(startDate) === true ?
-      startDate : luxon.DateTime.local().setZone('Asia/Seoul').toFormat('yyyy-LL-dd');
+    const updateStartDate = !!startDate && this.validateDateStringWithoutDash(startDate) === true ?
+      startDate : luxon.DateTime.local().setZone('Asia/Seoul').toFormat('yyyyLLdd');
     const userRef = this.UserRef(userId);
     const snap = await userRef.child(updateStartDate).once("value");
     const childData = snap.val() as { [key: string]: LogData };
+    if (childData === null) {
+      return {
+        date: updateStartDate,
+        data: {},
+      };
+    }
     return {
       date: updateStartDate,
-      data: childData,
-    }
+      data: childData === null ? {} : childData,
+    };
   }
 
   validateDateString(dateStr: string): boolean {
     const ptn = /(202[0-9]|201[0-9]|200[0-9]|[0-1][0-9]{3})-(1[0-2]|0[1-9])-(3[01]|[0-2][1-9]|[12]0)/;
     return ptn.test(dateStr);
+  }
+
+  validateDateStringWithoutDash(dateStr: string): boolean {
+    const ptn = /(202[0-9]|201[0-9]|200[0-9]|[0-1][0-9]{3})(1[0-2]|0[1-9])(3[01]|[0-2][1-9]|[12]0)/;
+    return ptn.test(dateStr);
+  }
+
+  checkAddWorkType(logs: LogData[], targetType: EN_WORK_TYPE) {
+    if (targetType === EN_WORK_TYPE.WORK || targetType === EN_WORK_TYPE.REMOTE) {
+      return this.possibleAddWorkOrRemote(logs);
+    }
+    if (targetType === EN_WORK_TYPE.BYEBYE) {
+      return this.possibleAddByeBye(logs);
+    }
+    if (targetType === EN_WORK_TYPE.REMOTEDONE) {
+      return this.possibleAddRemoteDone(logs);
+    }
+    if (targetType === EN_WORK_TYPE.REST) {
+      return this.possibleAddRest(logs);
+    }
+    if (targetType === EN_WORK_TYPE.EMERGENCY) {
+      return this.possibleAddEmergency(logs);
+    }
+    return false;
+  }
+
+  /** 출근을 기록할 수 있는가? */
+  possibleAddWorkOrRemote(logs: LogData[]) {
+
+    const remoteLogs = this.reduceWorkLogs(logs);
+
+    const haveTrue = Object.keys(remoteLogs).reduce(
+      (acc, cur) => {
+        if (acc === true) {
+          return acc;
+        }
+        if (remoteLogs[cur] === true) {
+          return true; 
+        }
+        return acc;
+      },
+      false);
+    // 한 개라도 WORK나 REMOTE가 열려있는가? false, 아니면 true
+    return !haveTrue;
+  }
+
+  possibleAddByeBye(logs: LogData[]) {
+    const remoteLogs = this.reduceWorkLogs(logs);
+    // work가 열려있어야만 가능.
+    return remoteLogs.WORK === true && remoteLogs.REMOTE === false && remoteLogs.EMERGENCY === false;
+  }
+
+  possibleAddRemoteDone(logs: LogData[]) {
+    const remoteLogs = this.reduceWorkLogs(logs);
+    // remote가 열려있어야 가능
+    return remoteLogs.WORK === false && remoteLogs.REMOTE === true && remoteLogs.EMERGENCY === false;
+  }
+
+  possibleAddRest(logs: LogData[]) {
+    const remoteLogs = this.reduceWorkLogs(logs);
+    // work나 remote가 열려있어야한다.
+    return remoteLogs.WORK === true || remoteLogs.REMOTE === true;
+  }
+
+  possibleAddEmergency(logs: LogData[]) {
+    const remoteLogs = this.reduceWorkLogs(logs);
+    // work, remote, emergency가 모두 close 일 때 가능
+    return remoteLogs.WORK === false && remoteLogs.REMOTE === false && remoteLogs.EMERGENCY === false;
+  }
+
+  private reduceWorkLogs(logs: LogData[]) {
+    return logs.reduce((acc: { WORK: boolean, REMOTE: boolean, EMERGENCY: boolean }, cur) => {
+      if (acc.WORK === false && cur.type === EN_WORK_TYPE.WORK) {
+        acc.WORK = true;
+      } else if (acc.WORK === true && cur.type === EN_WORK_TYPE.BYEBYE) {
+        acc.WORK = false;
+      }
+      if (acc.REMOTE === false && cur.type === EN_WORK_TYPE.REMOTE) {
+        acc.REMOTE = true;
+      } else if (acc.REMOTE === true && cur.type === EN_WORK_TYPE.REMOTEDONE) {
+        acc.REMOTE = false;
+      }
+      if (acc.EMERGENCY === false && cur.type === EN_WORK_TYPE.EMERGENCY && !!cur.done === false) {
+        acc.EMERGENCY = true;
+      }
+      return acc;
+    }, { WORK: false, REMOTE: false, EMERGENCY: false });
   }
 }
 

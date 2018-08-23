@@ -171,13 +171,24 @@ export async function addWorkLog (request, res) {
       targetDate: reqData.target_date,
     });
   } else {
-    // 완료 외의 기록
-    await WorkLog.store({
+    const logs = await WorkLog.find({
       userId: reqData.user_id,
-      type: reqData.type,
-      timeStr: reqData.time,
-      targetDate: reqData.target_date,
-    });
+      startDate: reqData.target_date,
+    });;
+    const logDataList = Object.keys(logs.data).map((mv) => logs.data[mv]);
+    // 검증 로직 추가.
+    const possibleAddWorkLog = WorkLog.checkAddWorkType(logDataList, reqData.type);
+
+    // 조건을 만족했거나, 관리자 권한이 있을 때!
+    if (possibleAddWorkLog === true || !!authInfo.data.auth === true) {
+      // 완료 외의 기록
+      await WorkLog.store({
+        userId: reqData.user_id,
+        type: reqData.type,
+        timeStr: reqData.time,
+        targetDate: reqData.target_date,
+      });
+    }
   }
   
   return res.send();
@@ -526,3 +537,4 @@ trigger_id: '397118842807.7909278821.7d4790b60fe730f2c4fa229e75848497' }
     .status(200)
     .send("완료");
 }
+;
