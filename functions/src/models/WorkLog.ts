@@ -87,14 +87,19 @@ export class WorkLogType {
     };
   }
 
-  async store({ userId, type, timeStr, targetDate }: IWorkLogRequest & { type: EN_WORK_TYPE, timeStr?: string, targetDate?: string }) {
+  async store({ userId, type, timeStr, targetDate, doneStr }: IWorkLogRequest & { type: EN_WORK_TYPE, timeStr?: string, targetDate?: string, doneStr?: string }) {
     const time = !!timeStr ? timeStr : Util.currentTimeStamp();
+    const done = !!doneStr ? doneStr : null;
     const childKey = !!targetDate? targetDate: Util.currentDate();
     const refKey = this.getRefKey();
     const userRef = this.UserRef(userId);
+    const pushObj = { refKey: refKey.key, time, type };
+    if (done !== null) {
+      pushObj['done'] = done;
+    }
     await userRef
       .child(childKey)
-      .push({ refKey: refKey.key, time, type });
+      .push(pushObj);
   }
 
   async updateData({ userId, updateDate, updateRecordkey, updateDataKey, updateTime }: IWorkLogRequest & { updateRecordkey: string, updateDataKey: keyof LogData, updateDate: string, updateTime: string }) {
