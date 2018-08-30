@@ -6,6 +6,8 @@ export enum EN_WORK_TYPE {
   DONE = 'DONE',
   REMOTE = 'REMOTE',
   REMOTEDONE = 'REMOTEDONE',
+  VACATION = 'VACATION',
+  HALFVACATION = 'HALFVACATION',
 }
 
 export enum EN_WORK_TITLE_KR {
@@ -16,4 +18,6 @@ export enum EN_WORK_TITLE_KR {
   DONE = '완료',
   REMOTE = '재택근무',
   REMOTEDONE = '재택근무_완료',
+  VACATION = '휴가',
+  HALFVACATION = '반차',
 }

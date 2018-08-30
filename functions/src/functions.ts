@@ -1,10 +1,13 @@
+import * as luxon from 'luxon';
+
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
-import { LogData, SlackSlashCommand, SlackActionInvocation } from './models/interface/SlackSlashCommand';
+import {
+    LogData, SlackActionInvocation, SlackSlashCommand
+} from './models/interface/SlackSlashCommand';
+import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
-import { Users } from './models/Users';
-import { auth } from '../node_modules/firebase-admin';
 
 const commandSet = {
   WORK: new Set(["출근", "ㅊㄱ", "ㅊㅊ", "hi"]),
@@ -170,6 +173,17 @@ export async function addWorkLog (request, res) {
       userId: reqData.user_id,
       targetDate: reqData.target_date,
     });
+  } else if (reqData.type === EN_WORK_TYPE.VACATION || reqData.type === EN_WORK_TYPE.HALFVACATION) {
+    // 휴가/반차 기록(기록은 모두 VACATION으로 한다.)
+    const now = luxon.DateTime.local();
+    const start = `${now.toFormat('yyyy-LL-dd')}T09:00:00+09:00`;
+    const end = `${now.toFormat('yyyy-LL-dd')}T${reqData.type === EN_WORK_TYPE.VACATION ? 17 : 13}:00:00+09:00`;
+    await WorkLog.store({
+      userId: reqData.user_id,
+      type: EN_WORK_TYPE.VACATION,
+      targetDate: reqData.target_date,
+      timeStr: start,
+      doneStr: end });
   } else {
     const logs = await WorkLog.find({
       userId: reqData.user_id,
