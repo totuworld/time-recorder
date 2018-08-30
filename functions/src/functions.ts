@@ -323,6 +323,12 @@ export async function modify(request, res) {
   if (authInfo.data.id !== user_id && !!authInfo.data.auth === false) {
     return res.status(401).send('unauthorized');
   }
+  const today = luxon.DateTime.local().setZone('Asia/Seoul');
+  const todayStr = today.toFormat('yyyyLLdd');
+  // 관리자가 아닌데 이전 기록을 수정하려하는가?
+  if (!!authInfo.data.auth === false && todayStr !== update_date) {
+    return res.status(401).send('unauthorized');
+  }
   const updateData = {
     userId: user_id,
     updateDate: update_date,
