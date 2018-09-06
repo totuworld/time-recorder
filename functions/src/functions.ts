@@ -329,9 +329,14 @@ export async function modify(request, res) {
     return res.status(401).send('unauthorized');
   }
   const today = luxon.DateTime.local().setZone('Asia/Seoul');
-  const todayStr = today.toFormat('yyyyLLdd');
-  // 관리자가 아닌데 이전 기록을 수정하려하는가?
-  if (!!authInfo.data.auth === false && todayStr !== update_date) {
+  const week = today.toISOWeekDate().substr(0, 8);
+  const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
+  const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const updateDate = luxon.DateTime.fromFormat(update_date, 'yyyyLLdd');
+  // 이번주 기록이 아닌데 수정하려고 하는가?
+  log(updateDate.diff(startDate).milliseconds);
+  log(updateDate.diff(endDate).milliseconds);
+  if (!!authInfo.data.auth === false && (updateDate.diff(startDate).milliseconds >= 0 && updateDate.diff(endDate).milliseconds <= 0) === false) {
     return res.status(401).send('unauthorized');
   }
   const updateData = {
