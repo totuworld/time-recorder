@@ -1,3 +1,4 @@
+import * as luxon from 'luxon';
 import { EN_WORK_TYPE } from "../../contants/enum/EN_WORK_TYPE";
 
 export interface SlackSlashCommand {
@@ -46,4 +47,12 @@ export interface LogData {
   time: string,
   type: EN_WORK_TYPE,
   done?: string,
+}
+
+export interface IOverWork {
+  week: string,
+  /** 해당 기간에 오버해서 일한 시간 */
+  over?: luxon.DateObjectUnits,
+  /** 사용하고 남은 시간 */
+  remain?: luxon.DateObjectUnits,
 }

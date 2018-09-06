@@ -1,5 +1,9 @@
+import debug from 'debug';
+
 import { FireabaseAdmin } from "../services/FirebaseAdmin";
 import { IUsers, IUserInfo, ILoginUserInfo } from "./interface/IUsers";
+
+const log = debug('tr:Users');
 
 export class UsersType {
   constructor() {
@@ -112,6 +116,22 @@ export class UsersType {
         result: false,
         data: null,
       }
+    }
+
+    async findAllLoginUser() {
+      const loginUserRef = this.LoginUsersRoot;
+      const snap = await loginUserRef.once('value');
+      const findUsers = snap.val() as { [key:string]:ILoginUserInfo };
+      if (!!findUsers === false) {
+        return [];
+      }
+      const returnValue = Object.keys(findUsers).map((key) => {
+        return {
+          auth_id: key,
+          ...findUsers[key],
+        }
+      });
+      return returnValue;
     }
 }
 

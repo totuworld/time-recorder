@@ -4,8 +4,8 @@ import * as uuid from 'uuid';
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from '../contants/enum/EN_WORK_TYPE';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { Util } from '../util';
-import { IWorkLogFindRequest, IWorkLogRequest } from './interface/IWorkLogRequest';
-import { LogData } from './interface/SlackSlashCommand';
+import { IWorkLogFindRequest, IWorkLogRequest, IOverWorkFindRequest } from './interface/IWorkLogRequest';
+import { LogData, IOverWork } from './interface/SlackSlashCommand';
 
 export class WorkLogType {
   constructor() {
@@ -24,9 +24,16 @@ export class WorkLogType {
     const workRef = FireabaseAdmin.Database.ref("work");
     return workRef;
   }
+  get OverTime() {
+    const overTimeRef = FireabaseAdmin.Database.ref("over_time");
+    return overTimeRef;
+  }
   /** 사용자별 store */
   UserRef(userId: string) {
     return this.UserRoot.child(userId);
+  }
+  OverTimeRef(id: string) {
+    return this.OverTime.child(id);
   }
 
   // #region 저장 기능
@@ -109,6 +116,14 @@ export class WorkLogType {
   }
   // #endregion
 
+  async findAllWithLuxonDateTime({ startDate, endDate, userId }: { startDate: luxon.DateTime, endDate: luxon.DateTime, userId: string }) {
+    return await this.findAll({
+      startDate: startDate.toISO(),
+      endDate: endDate.toISO(),
+      userId,
+    })
+  }
+
   async findAll({ userId, startDate, endDate }: IWorkLogRequest & IWorkLogFindRequest) {
     const haveStartEndDate = {
       start: !!startDate && this.validateDateString(startDate) === true,
@@ -118,7 +133,9 @@ export class WorkLogType {
     if (haveStartEndDate.start === false || haveStartEndDate.end === false ) {
       // 설정이 없다면 당일 데이터만 뽑아서 넘긴다.
       const todayData = await this.find({ userId });
-      return [todayData];
+      const data: {[key: string]: { [key: string]: LogData }} = {};
+      data[`${todayData.date}`] = todayData.data;
+      return [data];
     }
     const userRef = this.UserRef(userId);
     const snap = await userRef.once("value");
@@ -132,7 +149,7 @@ export class WorkLogType {
     const filterdSnap = Object.keys(updateValue).filter((fv) => {
       const fvDate = luxon.DateTime.fromFormat(fv, 'yyyyLLdd');
       return fvDate.diff(start).milliseconds >= 0 && fvDate.diff(end).milliseconds <= 0;
-    }).map((mv) => { const returnObject = {}; returnObject[mv] = updateValue[mv]; return returnObject; })
+    }).map((mv) => { const returnObject: { [key: string]: { [key: string]: LogData } } = {}; returnObject[mv] = updateValue[mv]; return returnObject; })
     return filterdSnap;
   }
 
@@ -245,6 +262,53 @@ export class WorkLogType {
       }
       return acc;
     }, { WORK: false, REMOTE: false, EMERGENCY: false });
+  }
+
+  async storeOverWorkTime({ login_auth_id, week, over_time_obj }: IOverWorkFindRequest & { over_time_obj: luxon.DurationObject; }): Promise<IOverWork> {
+    const overTimeRef = this.OverTimeRef(login_auth_id);
+    // 이미 기록이 있는지 확인.
+    const overWorkRecord = await this.findOverWorkTime({
+      login_auth_id,
+      week,
+    });
+    // 기존에 데이터가 있는가?
+    if (!!overWorkRecord === true) {
+      // 기존의 over 데이터를 갈아치우자. 대신.. 사용 기록이 엉킬 수 있다. 대망!
+      const updateData: IOverWork = {...overWorkRecord};
+      updateData.over = over_time_obj;
+      await overTimeRef.child(week).set(updateData);
+      return updateData;
+    }
+    const recordData: IOverWork = {
+      week,
+      over: over_time_obj,
+      remain: over_time_obj,
+    }
+    await overTimeRef.child(week).set(recordData);
+    return recordData;
+  }
+
+  async findOverWorkTime({ login_auth_id, week }: IOverWorkFindRequest): Promise<IOverWork> {
+    const overTimeRef = this.OverTimeRef(login_auth_id);
+    const snap = await overTimeRef.child(week).once('value');
+    const childData = snap.val() as IOverWork;
+    if (childData === null) {
+      return null;
+    }
+    return {
+      ...childData,
+    };
+  }
+
+  async findAllOverWorkTime({ login_auth_id }: { login_auth_id: string }): Promise<IOverWork[]> {
+    const overTimeRef = this.OverTimeRef(login_auth_id);
+    const snap = await overTimeRef.once('value');
+    const childData = snap.val() as { [key:string]: IOverWork };
+    if (childData === null) {
+      return [];
+    }
+    const returnData = Object.keys(childData).map((key) => childData[key]);
+    return returnData;
   }
 }
 

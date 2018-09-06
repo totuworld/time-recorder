@@ -1,3 +1,4 @@
+import debug from 'debug';
 import * as luxon from 'luxon';
 
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
@@ -8,6 +9,8 @@ import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
+import { Request, Response } from 'express';
+import { TimeRecord } from './models/TimeRecord';
 
 const commandSet = {
   WORK: new Set(["출근", "ㅊㄱ", "ㅊㅊ", "hi"]),
@@ -18,6 +21,8 @@ const commandSet = {
 };
 
 const SLACK_ACTION_REQUEST_PING = "ping-pong";
+
+const log = debug('tr:functions');
 
 export async function commandPing (request, response) {
   if (request.method !== "POST") {
@@ -557,4 +562,79 @@ trigger_id: '397118842807.7909278821.7d4790b60fe730f2c4fa229e75848497' }
     .status(200)
     .send("완료");
 }
-;
+
+/** 추가 근무 시간을 기록한다. */
+export async function storeOverWorkTime(request: Request, response: Response) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/
+  // week가 필요하다. 2018-W21
+  //   start는 week의 1 - 1 days, end는 week의 6
+  // 그리고 누구의 기록을 정리할지 필요하다.
+  // auth_user_id
+  const { week, auth_user_id, user_id } = request.body;
+  if (week === null || week === undefined || weekPtn.test(week) === false) {
+    return response.status(400).send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+  if (auth_user_id === null || auth_user_id === undefined) {
+    return response.status(400).send({ errorMessage: 'body.auth_user_id 누락' });
+  }
+
+  const timeObj = await getTimeObj(week, user_id, auth_user_id);
+  if (timeObj.haveData === false) {
+    return response.send({week});
+  }
+  const storeData = await WorkLog.storeOverWorkTime({
+    login_auth_id: auth_user_id,
+    over_time_obj: timeObj.timeObj,
+    week,
+  });
+  return response.send(storeData);
+}
+
+async function getTimeObj(week: string, user_id: string, auth_user_id: string) {
+  const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
+  const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  // RDB라면 range로 긇겠지만 firebase니까 후루룩 다 읽어야겠군. 후후후
+  const datas = await WorkLog.findAllWithLuxonDateTime({ startDate, endDate, userId: user_id });
+  const haveData = Object.keys(datas).length > 0;
+  const convertData = await TimeRecord.convertWorkTime(datas, startDate.toJSDate(), endDate.toJSDate());
+  const duration = luxon.Duration.fromObject(convertData.overTimeObj).as('milliseconds');
+  return { haveData, timeObj: { milliseconds: duration }};
+}
+
+/** 추가 근무시간 전체 기록 조회 */
+export async function findAllOverTime(request: Request, response: Response) {
+  const { auth_user_id } = request.query;
+  if (auth_user_id === null || auth_user_id === undefined) {
+    return response.status(400).send({ errorMessage: 'query.auth_user_id 누락' });
+  }
+
+  const datas = await WorkLog.findAllOverWorkTime({ login_auth_id: auth_user_id });
+  return response.send(datas);
+}
+
+/** 모든 로그인 사용자의 추가 근무 시간을 기록한한다. */
+export async function updateAllUsersOverWorkTime(request: Request, response: Response) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/
+  const { week } = request.body;
+  if (week === null || week === undefined || weekPtn.test(week) === false) {
+    return response.status(400).send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+
+  const users = await Users.findAllLoginUser();
+  const promises = users.map(async (mv) => {
+    const timeObj = await getTimeObj(week, mv.id, mv.auth_id);
+    if (timeObj.haveData === true) {
+      await WorkLog.storeOverWorkTime({
+        login_auth_id: mv.auth_id,
+        over_time_obj: timeObj.timeObj,
+        week,
+      });
+    }
+  });
+
+  while (promises.length > 0) {
+    await promises.pop();
+  }
+
+  return response.send();
+}

@@ -3,7 +3,7 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import {
-    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog
+    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -49,6 +49,9 @@ function routeList() {
     const findLoginUser = await Users.findLoginUser({ userUid });
     return res.send({ ...findLoginUser });
   });
+  router.post('/over_work', storeOverWorkTime);
+  router.post('/over_works/sync', updateAllUsersOverWorkTime);
+  router.get('/over_works', findAllOverTime);
   return router;
 }
 
