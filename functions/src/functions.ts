@@ -3,7 +3,7 @@ import * as luxon from 'luxon';
 
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
 import {
-    LogData, SlackActionInvocation, SlackSlashCommand
+    LogData, SlackActionInvocation, SlackSlashCommand, IOverWork, IFuseOverWork
 } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
@@ -210,6 +210,86 @@ export async function addWorkLog (request, res) {
     }
   }
   
+  return res.send();
+}
+
+/** 초과근무 시간을 차감하는 요청 */
+export async function addFuseWorkLog(request: Request, res: Response) {
+  const {
+    ...reqData
+  }: {
+    auth_user_id: string, // 로그인한 auth id
+    user_id: string, // slack id(대상자)
+    target_date: string, // 등록할 날짜
+    duration: string, // 얼마나 fuse할지(ISO8601 형식으로 받음 https://en.wikipedia.org/wiki/ISO_8601#Durations)
+  }
+  = request.body;
+
+  // 로그인 사용자 확인
+  const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
+  if (authInfo.result === false) {
+    return res.status(401).send('unauthorized');
+  }
+
+  // 다른 유저의 log를 추가하는가?
+  log(authInfo.data.id, authInfo.data.id !== reqData.user_id, !!authInfo.data.auth === false, authInfo.data.auth);
+  if (authInfo.data.id !== reqData.user_id && !!authInfo.data.auth === false) {
+    return res.status(401).send('unauthorized 2');
+  }
+
+  // 대상자의 정보를 로딩하자.
+  // 로그인한 사용자 전체 정보를 확인한 뒤 user_id와 매칭되는 것을 찾아야한다. 와 이거 더럽게 복잡한데?
+  const allLoginUsers = await Users.findAllLoginUser();
+  const targetUser = allLoginUsers.find((fv) => fv.id === reqData.user_id);
+  // 사용자가 없는가?
+  if (targetUser === null || targetUser === undefined) {
+    return res.status(204).send();
+  }
+  // 초과근무 내역 & 사용한 초고근무 시간 내역 조회
+  const [overTime, fuseTime] = await Promise.all([
+    WorkLog.findAllOverWorkTime({login_auth_id: targetUser.auth_id}),
+    WorkLog.findAllFuseOverWorkTime({login_auth_id: targetUser.auth_id})
+  ]);
+  if (overTime.length <= 0) {
+    // 기록이 없으면 fail
+    return res.status(400).send(`차감 가능한 초과근무가 없습니다`);
+  }
+  // 차감을 요청한 시간만큼 전체 시간을 보유했는지 확인한다.
+  const fuseDuration = luxon.Duration.fromISO(reqData.duration);
+  const totalOverWorkDuration = overTime.reduce((acc: luxon.Duration, cur: IOverWork) => {
+    if (cur.over === null || cur.over === undefined) {
+      return acc;
+    }
+    const tempDuration = luxon.Duration.fromObject(cur.over);
+    const updateAcc = acc.plus(tempDuration);
+    return updateAcc;
+  }, luxon.Duration.fromObject({milliseconds: 0}));
+  const totalFuseDuration = fuseTime.reduce((acc: luxon.Duration, cur: IFuseOverWork) => {
+    const tempDuration = luxon.Duration.fromISO(cur.use);
+    const updateAcc = acc.plus(tempDuration);
+    return updateAcc;
+  }, luxon.Duration.fromObject({milliseconds: 0}));
+  const totalRemainDuration = totalOverWorkDuration.minus(totalFuseDuration);
+  if (fuseDuration > totalRemainDuration) {
+    return res.status(400).send(`차감 가능 시간을 초과한 요청입니다`);
+  }
+  // 사용 기록을 추가한다.
+  await WorkLog.addFuseOverWorkTime({
+    login_auth_id: targetUser.auth_id,
+    date: reqData.target_date,
+    use: reqData.duration,
+  });
+  // 해당 날짜의 워크로그에 차감을 추가한다.
+  const time = luxon.DateTime.fromFormat(reqData.target_date, 'yyyyLLdd');
+  const timeStr = time.plus({hours: 9}).toISO();
+  const doneStr = time.plus({hours: 9}).plus(fuseDuration).toISO();
+  await WorkLog.store({
+    userId: targetUser.id,
+    timeStr,
+    doneStr,
+    targetDate: reqData.target_date,
+    type: EN_WORK_TYPE.FUSEOVERLOAD,
+  });
   return res.send();
 }
 
@@ -614,6 +694,16 @@ export async function findAllOverTime(request: Request, response: Response) {
   }
 
   const datas = await WorkLog.findAllOverWorkTime({ login_auth_id: auth_user_id });
+  return response.send(datas);
+}
+
+export async function findAllFuseOverTime(request: Request, response: Response) {
+  const { auth_user_id } = request.query;
+  if (auth_user_id === null || auth_user_id === undefined) {
+    return response.status(400).send({ errorMessage: 'query.auth_user_id 누락' });
+  }
+
+  const datas = await WorkLog.findAllFuseOverWorkTime({ login_auth_id: auth_user_id });
   return response.send(datas);
 }
 

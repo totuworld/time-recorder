@@ -52,7 +52,14 @@ export interface LogData {
 export interface IOverWork {
   week: string,
   /** 해당 기간에 오버해서 일한 시간 */
-  over?: luxon.DateObjectUnits,
+  over?: luxon.DurationObject,
   /** 사용하고 남은 시간 */
-  remain?: luxon.DateObjectUnits,
+  remain?: luxon.DurationObject,
+}
+
+export interface IFuseOverWork {
+  /** luxon (yyyyLLdd) */
+  date: string,
+  /** ISO 8601 duration(PTH4M2) */
+  use: string,
 }

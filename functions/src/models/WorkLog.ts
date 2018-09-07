@@ -1,3 +1,4 @@
+import debug from 'debug';
 import * as luxon from 'luxon';
 import * as uuid from 'uuid';
 
@@ -5,7 +6,9 @@ import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from '../contants/enum/EN_WORK_TYPE';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { Util } from '../util';
 import { IWorkLogFindRequest, IWorkLogRequest, IOverWorkFindRequest } from './interface/IWorkLogRequest';
-import { LogData, IOverWork } from './interface/SlackSlashCommand';
+import { LogData, IOverWork, IFuseOverWork } from './interface/SlackSlashCommand';
+
+const log = debug('tr:WorkLogType');
 
 export class WorkLogType {
   constructor() {
@@ -28,12 +31,20 @@ export class WorkLogType {
     const overTimeRef = FireabaseAdmin.Database.ref("over_time");
     return overTimeRef;
   }
+
+  get FuseOverTime() {
+    const fuseOverTimeRef = FireabaseAdmin.Database.ref("fuse_over_time");
+    return fuseOverTimeRef;
+  }
   /** 사용자별 store */
   UserRef(userId: string) {
     return this.UserRoot.child(userId);
   }
   OverTimeRef(id: string) {
     return this.OverTime.child(id);
+  }
+  FuseOverTimeRef(id: string) {
+    return this.FuseOverTime.child(id);
   }
 
   // #region 저장 기능
@@ -97,6 +108,7 @@ export class WorkLogType {
   async store({ userId, type, timeStr, targetDate, doneStr }: IWorkLogRequest & { type: EN_WORK_TYPE, timeStr?: string, targetDate?: string, doneStr?: string }) {
     const time = !!timeStr ? timeStr : Util.currentTimeStamp();
     const done = !!doneStr ? doneStr : null;
+    log(done, doneStr);
     const childKey = !!targetDate? targetDate: Util.currentDate();
     const refKey = this.getRefKey();
     const userRef = this.UserRef(userId);
@@ -264,7 +276,7 @@ export class WorkLogType {
     }, { WORK: false, REMOTE: false, EMERGENCY: false });
   }
 
-  async storeOverWorkTime({ login_auth_id, week, over_time_obj }: IOverWorkFindRequest & { over_time_obj: luxon.DurationObject; }): Promise<IOverWork> {
+  async storeOverWorkTime({ login_auth_id, week, over_time_obj, remain_time_obj }: IOverWorkFindRequest & { over_time_obj: luxon.DurationObject, remain_time_obj?: luxon.DurationObject }): Promise<IOverWork> {
     const overTimeRef = this.OverTimeRef(login_auth_id);
     // 이미 기록이 있는지 확인.
     const overWorkRecord = await this.findOverWorkTime({
@@ -276,13 +288,16 @@ export class WorkLogType {
       // 기존의 over 데이터를 갈아치우자. 대신.. 사용 기록이 엉킬 수 있다. 대망!
       const updateData: IOverWork = {...overWorkRecord};
       updateData.over = over_time_obj;
+      if (!!remain_time_obj) {
+        updateData['remain'] = remain_time_obj;
+      }
       await overTimeRef.child(week).set(updateData);
       return updateData;
     }
     const recordData: IOverWork = {
       week,
       over: over_time_obj,
-      remain: over_time_obj,
+      remain: !!remain_time_obj ? remain_time_obj : over_time_obj,
     }
     await overTimeRef.child(week).set(recordData);
     return recordData;
@@ -304,6 +319,25 @@ export class WorkLogType {
     const overTimeRef = this.OverTimeRef(login_auth_id);
     const snap = await overTimeRef.once('value');
     const childData = snap.val() as { [key:string]: IOverWork };
+    if (childData === null) {
+      return [];
+    }
+    const returnData = Object.keys(childData).map((key) => childData[key]);
+    return returnData;
+  }
+
+  async addFuseOverWorkTime({ login_auth_id, date, use }: { login_auth_id: string, date: string, use: string }) {
+    const fuseOverTimeRef = this.FuseOverTimeRef(login_auth_id);
+    await fuseOverTimeRef.push({
+      date,
+      use
+    });
+  }
+
+  async findAllFuseOverWorkTime({ login_auth_id }: { login_auth_id: string }): Promise<IFuseOverWork[]> {
+    const fuseOverTimeRef = this.FuseOverTimeRef(login_auth_id);
+    const snap = await fuseOverTimeRef.once('value');
+    const childData = snap.val() as { [key:string]: IFuseOverWork };
     if (childData === null) {
       return [];
     }
