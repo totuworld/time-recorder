@@ -707,6 +707,38 @@ export async function findAllFuseOverTime(request: Request, response: Response) 
   return response.send(datas);
 }
 
+export async function findAllOverTimeByUserId(request: Request, response: Response) {
+  const { user_id } = request.query;
+  if (user_id === null || user_id === undefined) {
+    return response.status(400).send({ errorMessage: 'query.user_id 누락' });
+  }
+
+  const allLoginUsers = await Users.findAllLoginUser();
+  const targetUser = allLoginUsers.find((fv) => fv.id === user_id);
+  if (targetUser === null || targetUser === undefined) {
+    return response.status(204).send();
+  }
+
+  const datas = await WorkLog.findAllOverWorkTime({ login_auth_id: targetUser.auth_id });
+  return response.send(datas);
+}
+
+export async function findAllFuseOverTimeByUserId(request: Request, response: Response) {
+  const { user_id } = request.query;
+  if (user_id === null || user_id === undefined) {
+    return response.status(400).send({ errorMessage: 'query.user_id 누락' });
+  }
+
+  const allLoginUsers = await Users.findAllLoginUser();
+  const targetUser = allLoginUsers.find((fv) => fv.id === user_id);
+  if (targetUser === null || targetUser === undefined) {
+    return response.status(204).send();
+  }
+
+  const datas = await WorkLog.findAllFuseOverWorkTime({ login_auth_id: user_id });
+  return response.send(datas);
+}
+
 /** 모든 로그인 사용자의 추가 근무 시간을 기록한한다. */
 export async function updateAllUsersOverWorkTime(request: Request, response: Response) {
   const weekPtn = /[0-9]{4}-W[0-9]{2}/

@@ -3,7 +3,7 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import {
-    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime, findAllFuseOverTime, addFuseWorkLog
+    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime, findAllFuseOverTime, addFuseWorkLog, findAllOverTimeByUserId, findAllFuseOverTimeByUserId
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -53,7 +53,9 @@ function routeList() {
   router.post('/over_works/sync', updateAllUsersOverWorkTime);
   router.get('/over_works', findAllOverTime); // 누적된 추가근무시간 목록
   router.get('/fuse_over_works', findAllFuseOverTime); // 차감한 추가근무 시간 목록
-  router.post('/fuse_over_work', addFuseWorkLog)
+  router.get('/over_works_by_user_id', findAllOverTimeByUserId); // 누적된 추가근무시간 목록
+  router.get('/fuse_over_works_by_user_id', findAllFuseOverTimeByUserId); // 차감한 추가근무 시간 목록
+  router.post('/fuse_over_work', addFuseWorkLog);
   return router;
 }
 
