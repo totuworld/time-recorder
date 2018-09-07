@@ -3,7 +3,7 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import {
-    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime, findAllFuseOverTime, addFuseWorkLog, findAllOverTimeByUserId, findAllFuseOverTimeByUserId
+    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime, findAllFuseOverTime, addFuseWorkLog, findAllOverTimeByUserId, findAllFuseOverTimeByUserId, getAllGroupInfo
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -29,6 +29,7 @@ function routeList() {
   });
   router.get('/get_all', getAll);
   router.get('/get_groups', getGroups);
+  router.get('/get_group_infos', getAllGroupInfo);
   router.get('/get_user', getUser);
   router.post('/message_action', messageAction);
   router.post('/update_record', modify);

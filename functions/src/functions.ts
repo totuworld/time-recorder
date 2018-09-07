@@ -458,6 +458,11 @@ export async function getGroups(request, response) {
   return response.contentType("json").send(resp);
 }
 
+export async function getAllGroupInfo(_, response) {
+  const resp = await Users.findAllGroupInfo();
+  return response.contentType("json").send(resp);
+}
+
 export async function getUser(request, response) {
   const userId = request.query["userId"];
   if (!!userId === false) {
@@ -735,7 +740,7 @@ export async function findAllFuseOverTimeByUserId(request: Request, response: Re
     return response.status(204).send();
   }
 
-  const datas = await WorkLog.findAllFuseOverWorkTime({ login_auth_id: user_id });
+  const datas = await WorkLog.findAllFuseOverWorkTime({ login_auth_id: targetUser.auth_id });
   return response.send(datas);
 }
 

@@ -2,6 +2,7 @@ import debug from 'debug';
 
 import { FireabaseAdmin } from "../services/FirebaseAdmin";
 import { IUsers, IUserInfo, ILoginUserInfo } from "./interface/IUsers";
+import { IGroupInfo } from './interface/IGroupInfo';
 
 const log = debug('tr:Users');
 
@@ -15,6 +16,11 @@ export class UsersType {
     /** groups root store */
     get GroupRoot() {
       const rootRef = FireabaseAdmin.Database.ref("groups");
+      return rootRef;
+    }
+
+    get GroupInfoRoot() {
+      const rootRef = FireabaseAdmin.Database.ref("group_infos");
       return rootRef;
     }
     /** 모든 워크로그 기록 */
@@ -59,6 +65,16 @@ export class UsersType {
       });
       const userInfos = Promise.all(promises);
       return userInfos;
+    }
+
+    async findAllGroupInfo() {
+      const groupInfoRef = this.GroupInfoRoot;
+      const snap = await groupInfoRef.once('value');
+      const groupInfo = snap.val() as { [key: string]: IGroupInfo };
+      if (!!groupInfo) {
+        return Object.keys(groupInfo).map((mv) => groupInfo[mv]);
+      }
+      return [];
     }
 
     async addLoginUser({ userUid, email }: { userUid: string, email: string }) {
