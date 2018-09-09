@@ -36,4 +36,38 @@ export class Util {
     const duration = bTime.diff(aTime).normalize();
     return duration;
   }
+
+  public static isEmpty<T>(
+    value?: T | undefined | null
+  ): value is null | undefined {
+    if (value === undefined || value === null) {
+      return true
+    }
+
+    if (typeof value === 'number' && isNaN(value)) {
+      return true
+    }
+
+    if (typeof value === 'string' && value === '') {
+      return true
+    }
+
+    if (typeof value === 'object' && Array.isArray(value) && value.length < 1) {
+      return true
+    }
+
+    if (
+      typeof value === 'object' &&
+      !(value instanceof Date) &&
+      Object.keys(value).length < 1
+    ) {
+      return true
+    }
+
+    return false
+  }
+
+  public static isNotEmpty<T>(value?: T | null | undefined): value is T {
+    return !Util.isEmpty<T>(value)
+  }
 }

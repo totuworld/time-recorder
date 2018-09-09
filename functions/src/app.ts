@@ -3,7 +3,10 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import {
-    commandHistory, commandPing, getAll, getGroups, getUser, messageAction, modify, addWorkLog, storeOverWorkTime, findAllOverTime, updateAllUsersOverWorkTime, findAllFuseOverTime, addFuseWorkLog, findAllOverTimeByUserId, findAllFuseOverTimeByUserId, getAllGroupInfo
+    addFuseWorkLog, addWorkLog, commandHistory, commandPing, findAllFuseOverTime,
+    findAllFuseOverTimeByUserId, findAllOverTime, findAllOverTimeByUserId, getAll, getAllGroupInfo,
+    getGroups, getUser, messageAction, modify, storeOverWorkTime, updateAllUsersOverWorkTime,
+    updateUserOverWorkTime
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -51,7 +54,8 @@ function routeList() {
     return res.send({ ...findLoginUser });
   });
   router.post('/over_work', storeOverWorkTime);
-  router.post('/over_works/sync', updateAllUsersOverWorkTime);
+  router.post('/over_works/sync', updateAllUsersOverWorkTime); // 전체 사용자의 추가근무를 기록
+  router.post('/over_work/sync', updateUserOverWorkTime); // 특정 사용자의 추가근무 기록
   router.get('/over_works', findAllOverTime); // 누적된 추가근무시간 목록
   router.get('/fuse_over_works', findAllFuseOverTime); // 차감한 추가근무 시간 목록
   router.get('/over_works_by_user_id', findAllOverTimeByUserId); // 누적된 추가근무시간 목록

@@ -744,7 +744,7 @@ export async function findAllFuseOverTimeByUserId(request: Request, response: Re
   return response.send(datas);
 }
 
-/** 모든 로그인 사용자의 추가 근무 시간을 기록한한다. */
+/** 모든 로그인 사용자의 추가 근무 시간을 기록한다. */
 export async function updateAllUsersOverWorkTime(request: Request, response: Response) {
   const weekPtn = /[0-9]{4}-W[0-9]{2}/
   const { week } = request.body;
@@ -768,5 +768,34 @@ export async function updateAllUsersOverWorkTime(request: Request, response: Res
     await promises.pop();
   }
 
+  return response.send();
+}
+
+/** user_id나 auth_user_id로 추가 근무 시간을 기록한다.  */
+export async function updateUserOverWorkTime(request: Request, response: Response) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/
+  const { week, user_id, auth_user_id } = request.body;
+  if (Util.isEmpty(week) || weekPtn.test(week) === false) {
+    return response.status(400).send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+  // user_id나 auth_user_id가 없는가?
+  if ((Util.isEmpty(user_id)) && (Util.isEmpty(auth_user_id))) {
+    return response.status(400).send({ errorMessage: '대상 유저가 누구인지 알 수 없음(user_id, auth_user_id)' });
+  }
+
+  const users = await Users.findAllLoginUser();
+  const targetUser = Util.isNotEmpty(user_id) ? users.find((fv) => fv.id === user_id) : users.find((fv) => fv.auth_id === auth_user_id);
+  if (targetUser === null || targetUser === undefined) {
+    return response.status(204).send();
+  }
+
+  const timeObj = await getTimeObj(week, targetUser.id, targetUser.auth_id);
+  if (timeObj.haveData === true) {
+    await WorkLog.storeOverWorkTime({
+      login_auth_id: targetUser.auth_id,
+      over_time_obj: timeObj.timeObj,
+      week,
+    });
+  }
   return response.send();
 }
