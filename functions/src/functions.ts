@@ -688,6 +688,9 @@ async function getTimeObj(week: string, user_id: string, auth_user_id: string) {
   const haveData = Object.keys(datas).length > 0;
   const convertData = await TimeRecord.convertWorkTime(datas, startDate.toJSDate(), endDate.toJSDate());
   const duration = luxon.Duration.fromObject(convertData.overTimeObj).as('milliseconds');
+  if (convertData.overTimeIsMinus === true) {
+    return { haveData, timeObj: { milliseconds: -duration }};
+  }
   return { haveData, timeObj: { milliseconds: duration }};
 }
 
