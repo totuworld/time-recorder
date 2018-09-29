@@ -680,13 +680,13 @@ export async function storeOverWorkTime(request: Request, response: Response) {
   return response.send(storeData);
 }
 
-async function getTimeObj(week: string, user_id: string, auth_user_id: string) {
+async function getTimeObj(week: string, user_id: string, auth_user_id: string, holidayDuration?: luxon.Duration) {
   const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
   const endDate = luxon.DateTime.fromISO(`${week}-6`);
   // RDB라면 range로 긇겠지만 firebase니까 후루룩 다 읽어야겠군. 후후후
   const datas = await WorkLog.findAllWithLuxonDateTime({ startDate, endDate, userId: user_id });
   const haveData = Object.keys(datas).length > 0;
-  const convertData = await TimeRecord.convertWorkTime(datas, startDate.toJSDate(), endDate.toJSDate());
+  const convertData = await TimeRecord.convertWorkTime(datas, startDate.toJSDate(), endDate.toJSDate(), holidayDuration);
   const duration = luxon.Duration.fromObject(convertData.overTimeObj).as('milliseconds');
   if (convertData.overTimeIsMinus === true) {
     return { haveData, timeObj: { milliseconds: -duration }};
@@ -755,9 +755,14 @@ export async function updateAllUsersOverWorkTime(request: Request, response: Res
     return response.status(400).send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
   }
 
-  const users = await Users.findAllLoginUser();
+  const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
+  const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const [ users, holidayDuration ] = await Promise.all([
+    Users.findAllLoginUser(),
+    WorkLog.getHolidaysDuration(startDate, endDate),
+  ]);
   const promises = users.map(async (mv) => {
-    const timeObj = await getTimeObj(week, mv.id, mv.auth_id);
+    const timeObj = await getTimeObj(week, mv.id, mv.auth_id, holidayDuration);
     if (timeObj.haveData === true) {
       await WorkLog.storeOverWorkTime({
         login_auth_id: mv.auth_id,
@@ -786,13 +791,18 @@ export async function updateUserOverWorkTime(request: Request, response: Respons
     return response.status(400).send({ errorMessage: '대상 유저가 누구인지 알 수 없음(user_id, auth_user_id)' });
   }
 
-  const users = await Users.findAllLoginUser();
+  const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
+  const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const [ users, holidayDuration ] = await Promise.all([
+    Users.findAllLoginUser(),
+    WorkLog.getHolidaysDuration(startDate, endDate),
+  ]);
   const targetUser = Util.isNotEmpty(user_id) ? users.find((fv) => fv.id === user_id) : users.find((fv) => fv.auth_id === auth_user_id);
   if (targetUser === null || targetUser === undefined) {
     return response.status(204).send();
   }
 
-  const timeObj = await getTimeObj(week, targetUser.id, targetUser.auth_id);
+  const timeObj = await getTimeObj(week, targetUser.id, targetUser.auth_id, holidayDuration);
   if (timeObj.haveData === true) {
     await WorkLog.storeOverWorkTime({
       login_auth_id: targetUser.auth_id,
@@ -801,4 +811,15 @@ export async function updateUserOverWorkTime(request: Request, response: Respons
     });
   }
   return response.send();
+}
+
+export async function getHolidays(request: Request, response: Response) {
+  const { start_date, end_date } = request.query;
+  if (Util.isEmpty(start_date) || Util.isEmpty(end_date)) {
+    return response.status(400).send({ errorMessage: 'query에 start_date, end_date 누락(yyyy-mm-dd)' });
+  }
+  const convertStartDate = luxon.DateTime.fromISO(start_date);
+  const convertEndDate = luxon.DateTime.fromISO(end_date);
+  const holidays = await WorkLog.getHolidays(convertStartDate, convertEndDate);
+  return response.json(holidays);
 }

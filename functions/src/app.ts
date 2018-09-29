@@ -6,7 +6,7 @@ import {
     addFuseWorkLog, addWorkLog, commandHistory, commandPing, findAllFuseOverTime,
     findAllFuseOverTimeByUserId, findAllOverTime, findAllOverTimeByUserId, getAll, getAllGroupInfo,
     getGroups, getUser, messageAction, modify, storeOverWorkTime, updateAllUsersOverWorkTime,
-    updateUserOverWorkTime
+    updateUserOverWorkTime, getHolidays
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -61,6 +61,7 @@ function routeList() {
   router.get('/over_works_by_user_id', findAllOverTimeByUserId); // 누적된 추가근무시간 목록
   router.get('/fuse_over_works_by_user_id', findAllFuseOverTimeByUserId); // 차감한 추가근무 시간 목록
   router.post('/fuse_over_work', addFuseWorkLog);
+  router.get('/holidays', getHolidays);
   return router;
 }
 

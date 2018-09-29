@@ -107,6 +107,7 @@ export class TimeRecord {
     value: Array<{ [key: string]: { [key: string]: LogData } }>,
     startDate: Date,
     endDate: Date,
+    holidayDuration?: luxon.Duration,
   ) {
     const updateDatas = value.length > 0 ? value.map((mv) => {
       const dateStr = Object.keys(mv)[0];
@@ -172,7 +173,10 @@ export class TimeRecord {
       range -= (weekCount * 2);
     }
     const workDuration = luxon.Duration.fromObject(calWorkTimeObj);
-    const weekWorkDuration = luxon.Duration.fromISO('PT40H');
+    let weekWorkDuration = luxon.Duration.fromISO('PT40H');
+    if (!!holidayDuration) {
+      weekWorkDuration = weekWorkDuration.minus(holidayDuration);
+    }
     const overTimeObj = workDuration > weekWorkDuration ?
       workDuration.minus(weekWorkDuration) :
       weekWorkDuration.minus(workDuration);

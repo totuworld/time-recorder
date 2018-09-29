@@ -36,6 +36,12 @@ export class WorkLogType {
     const fuseOverTimeRef = FireabaseAdmin.Database.ref("fuse_over_time");
     return fuseOverTimeRef;
   }
+
+  get Holiday() {
+    const holiDayRef = FireabaseAdmin.Database.ref("public_holiday");
+    return holiDayRef;
+  }
+
   /** 사용자별 store */
   UserRef(userId: string) {
     return this.UserRoot.child(userId);
@@ -343,6 +349,24 @@ export class WorkLogType {
     }
     const returnData = Object.keys(childData).map((key) => childData[key]);
     return returnData;
+  }
+
+  async getHolidaysDuration(startDate: luxon.DateTime, endDate: luxon.DateTime) {
+    const values = await this.getHolidays(startDate, endDate);
+    return luxon.Duration.fromISO(`PT${values.length * 8}H`);
+  }
+
+  async getHolidays(startDate: luxon.DateTime, endDate: luxon.DateTime) {
+    const ref = this.Holiday;
+    const snap = await ref.once('value');
+    const childData = snap.val() as { [key:string]: { date: string, name: string } };
+    const values = Object.keys(childData)
+      .map(mv => childData[mv])
+      .filter((fv) => {
+        const date = luxon.DateTime.fromFormat(fv.date, 'yyyy-LL-dd');
+        return date >= startDate && date <= endDate;
+      });
+    return values;
   }
 }
 
