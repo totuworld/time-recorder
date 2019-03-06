@@ -1,5 +1,5 @@
 export interface IUsers {
-  [key: string]: IUsersItem
+  [key: string]: IUsersItem;
 }
 
 export interface IUsersItem {
@@ -17,4 +17,8 @@ export interface ILoginUserInfo {
   email: string;
   id: string;
   auth: number | null;
+}
+
+export interface ISlackUserInfo extends IUserInfo {
+  auth_id?: string;
 }

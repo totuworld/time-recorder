@@ -1,5 +1,5 @@
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 
 class FireabaseAdminType {
   private init: boolean = false;
@@ -17,14 +17,15 @@ class FireabaseAdminType {
         credential: {
           privateKey: process.env.privateKey.replace(/\\n/g, '\n'),
           clientEmail: process.env.clientEmail,
-          projectId: process.env.projectId,
+          projectId: process.env.projectId
         }
-      }
+      };
     }
 
     admin.initializeApp({
       databaseURL: config.databaseurl,
-      credential: admin.credential.cert(config.credential)});
+      credential: admin.credential.cert(config.credential)
+    });
     this.init = true;
   }
 
