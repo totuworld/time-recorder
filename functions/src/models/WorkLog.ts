@@ -114,7 +114,7 @@ export class WorkLogType {
       EN_WORK_TITLE_KR[updateData.type]
     } 완료 (소요: ${durationStr})`;
     updateData.done = time;
-    userRef
+    await userRef
       .child(date)
       .child(updateData.key)
       .set(updateData);
@@ -161,7 +161,7 @@ export class WorkLogType {
       /-/gi.test(targetDate) === true
         ? targetDate.replace(/-/gi, '')
         : targetDate;
-    return await userRef
+    return userRef
       .child(updateTargetDate)
       .child(log_id)
       .set(null);
@@ -183,7 +183,7 @@ export class WorkLogType {
       .child(updateDate)
       .child(updateRecordkey)
       .child(updateDataKey);
-    const resp = await targetRef.set(updateTime);
+    await targetRef.set(updateTime);
   }
   // #endregion
   async findAllWithLuxonDateTime({

@@ -702,7 +702,7 @@ trigger_id: '397118842807.7909278821.7d4790b60fe730f2c4fa229e75848497' }
       EN_WORK_TITLE_KR[updateData.type]
     } 완료 (소요: ${durationStr})`;
     updateData.done = time;
-    userRef
+    await userRef
       .child(`${Util.currentDate()}`)
       .child(updateData.key)
       .set(updateData);
