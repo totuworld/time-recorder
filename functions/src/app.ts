@@ -1,6 +1,7 @@
 import * as bodyParser from 'body-parser';
 // express로 사용되는 app
 import express from 'express';
+
 import { addDatas } from './addUsers';
 import {
   addFuseWorkLog,
@@ -9,10 +10,12 @@ import {
   commandHistory,
   commandPing,
   deleteUserQueue,
+  deleteWorkLog,
   findAllFuseOverTime,
   findAllFuseOverTimeByUserId,
   findAllOverTime,
   findAllOverTimeByUserId,
+  findWeekOverTimeByUserId,
   getAll,
   getAllGroupInfo,
   getAllSlackUserInfo,
@@ -24,13 +27,13 @@ import {
   modify,
   storeOverWorkTime,
   updateAllUsersOverWorkTime,
-  updateUserOverWorkTime,
-  findWeekOverTimeByUserId,
-  deleteWorkLog
+  updateAllUsersOverWorkTimeTodayWorkker,
+  updateUserOverWorkTime
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
 import { Util } from './util';
+
 const app = express();
 app.disable('x-powered-by');
 function routeList() {
@@ -76,6 +79,11 @@ function routeList() {
   });
   router.post('/over_work', storeOverWorkTime);
   router.post('/over_works/sync', updateAllUsersOverWorkTime); // 전체 사용자의 추가근무를 기록
+  router.post(
+    '/over_works/sync_for_workers',
+    updateAllUsersOverWorkTimeTodayWorkker
+  ); // 출근 기록을 보유한 전체 사용자 추가 근무 기록 생성
+
   router.post('/over_work/sync', updateUserOverWorkTime); // 특정 사용자의 추가근무 기록
   router.get('/over_works', findAllOverTime); // 누적된 추가근무시간 목록
   router.get('/over_work/:target_date', findWeekOverTimeByUserId); // 특정 주의 추가 근무 조회

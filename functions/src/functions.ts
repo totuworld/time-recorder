@@ -958,6 +958,67 @@ export async function updateUserOverWorkTime(
   }
   return response.send();
 }
+export async function updateAllUsersOverWorkTimeTodayWorkker(
+  request: Request,
+  response: Response
+) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/;
+  const { week } = request.body;
+  if (week === null || week === undefined || weekPtn.test(week) === false) {
+    return response
+      .status(400)
+      .send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+  const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
+  const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const [users, holidayDuration] = await Promise.all([
+    Users.findAllLoginUser(),
+    WorkLog.getHolidaysDuration(startDate, endDate)
+  ]);
+  const promises = users.map(async mv => {
+    // 당일 워크 기록을 확인 한 뒤 출근 로그가 있으면 작동한다.
+    const today = luxon.DateTime.local()
+      .setZone('Asia/Seoul')
+      .toFormat('yyyy-MM-dd');
+    const resp = await WorkLog.findAll({
+      userId: mv.id,
+      startDate: today,
+      endDate: today
+    });
+    log(resp, mv.auth_id);
+    if (!!resp === true && resp.length > 0) {
+      const first = resp[0];
+      let haveWork = false;
+      Object.keys(first).map(fv => {
+        if (
+          haveWork === false &&
+          Object.keys(first[fv]).map(
+            sfv => first[fv][sfv].type === EN_WORK_TYPE.WORK
+          ).length > 0
+        ) {
+          haveWork = true;
+        }
+      });
+      const timeObj = await getTimeObj(
+        week,
+        mv.id,
+        mv.auth_id,
+        holidayDuration
+      );
+      if (haveWork && timeObj.haveData === true) {
+        await WorkLog.storeOverWorkTime({
+          login_auth_id: mv.auth_id,
+          over_time_obj: timeObj.timeObj,
+          week
+        });
+      }
+    }
+  });
+  while (promises.length > 0) {
+    await promises.pop();
+  }
+  return response.send();
+}
 export async function getHolidays(request: Request, response: Response) {
   const { start_date, end_date } = request.query;
   if (Util.isEmpty(start_date) || Util.isEmpty(end_date)) {
