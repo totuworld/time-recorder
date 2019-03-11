@@ -30,7 +30,7 @@ export async function addDatas(req: Request, res: Response) {
   const refRdb = FireabaseAdmin.Database.ref('users');
   const rdb_promises = filterdUsers.map(async mv => {
     console.log(mv.id);
-    return await refRdb.child(mv.id).set({
+    return refRdb.child(mv.id).set({
       id: mv.id,
       email: mv.profile.email,
       name: mv.name,
@@ -60,7 +60,7 @@ export async function addUserToRealTime(req: Request, res: Response) {
   const ref = FireabaseAdmin.Database.ref('users');
   const promises = filterdUsers.map(async mv => {
     console.log(mv.id);
-    return await ref.child(mv.id).set({
+    return ref.child(mv.id).set({
       id: mv.id,
       email: mv.profile.email,
       name: mv.name,
