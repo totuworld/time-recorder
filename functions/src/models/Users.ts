@@ -171,11 +171,10 @@ export class UsersType {
   }
   async findAllSlackUserInfo() {
     const searchSnap = await this.SlackUsersStore.get();
-    const userInfos = searchSnap.docs
-      .map(doc => {
-        return doc.data() as ISlackUserInfo;
-      })
-      .filter(fv => !!fv.auth_id === true);
+    const userInfos = searchSnap.docs.map(doc => {
+      console.log(doc.data());
+      return doc.data() as ISlackUserInfo;
+    });
     return userInfos;
   }
   async findUserQueue({ userUid }: { userUid: string }) {

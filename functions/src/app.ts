@@ -3,6 +3,18 @@ import * as bodyParser from 'body-parser';
 import express from 'express';
 
 import { addDatas } from './addUsers';
+import { addBeverage, findAllBeverage } from './controller/beverage/beverage';
+import {
+  addEvent,
+  addGuests,
+  addOrder,
+  findAllEvent,
+  findEvent,
+  findGuests,
+  findOrders,
+  sendMsgToGuests,
+  updateEvent
+} from './controller/event/event';
 import {
   addFuseWorkLog,
   addUserQueue,
@@ -97,6 +109,19 @@ function routeList() {
   router.delete('/get_user/:authId/queue/:key', deleteUserQueue);
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
+
+  router.get('/events', findAllEvent);
+  router.post('/events', addEvent);
+  router.put('/events/:eventId', updateEvent);
+  router.get('/events/:eventId', findEvent);
+  router.post('/events/:eventId/guests', addGuests);
+  router.get('/events/:eventId/guests', findGuests);
+  router.post('/events/:eventId/guests/msg', sendMsgToGuests);
+  router.post('/events/:eventId/orders', addOrder);
+  router.get('/events/:eventId/orders', findOrders);
+
+  router.post('/beverages', addBeverage);
+  router.get('/beverages', findAllBeverage);
   return router;
 }
 // parse application/x-www-form-urlencoded

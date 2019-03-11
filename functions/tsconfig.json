@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["es6"],
+    "lib": ["es6", "esnext.asynciterable"],
     "module": "commonjs",
     "noImplicitReturns": true,
     "outDir": "lib",
@@ -10,6 +10,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noImplicitAny": false,
+    "plugins": [{ "name": "typescript-tslint-plugin" }]
   },
   "exclude": [
     "node_modules",

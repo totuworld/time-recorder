@@ -1,4 +1,5 @@
 # Created by https://www.gitignore.io/api/node,firebase
+.DS_Store
 
 ### Firebase ###
 .idea
@@ -82,6 +83,8 @@ typings/
 
 # Serverless directories
 .serverless
+
+now.json
 
 
 # End of https://www.gitignore.io/api/node,firebase
