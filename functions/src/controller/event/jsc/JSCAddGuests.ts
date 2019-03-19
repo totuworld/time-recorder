@@ -12,9 +12,12 @@ export const JSCAddGuests: IJSONSchemaType = {
         },
         real_name: {
           type: 'string'
+        },
+        profile_url: {
+          type: 'string'
         }
       },
-      required: ['id', 'name', 'real_name'],
+      required: ['id', 'name', 'real_name', 'profile_url'],
       type: 'object'
     }
   },

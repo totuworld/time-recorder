@@ -72,11 +72,11 @@ export async function addEvent(req: Request, res: Response) {
     const reqParams = {
       ...validateReq.data.body,
       desc:
-        validateReq.data.body.desc === undefined
+        validateReq.data.body.desc !== undefined
           ? validateReq.data.body.desc
           : '',
       private:
-        validateReq.data.body.private === undefined
+        validateReq.data.body.private !== undefined
           ? validateReq.data.body.private
           : false
     };
@@ -298,11 +298,13 @@ export async function sendMsgToGuests(req: Request, res: Response) {
     if (!!result === false) {
       return res.status(404).send({ error_message: '?' });
     }
-    // 게스트를 조회한다.
-    const guests = await Events.findGuests({
-      eventId: validateReq.data.params.eventId
-    });
-    log(guests);
+    // 게스트, 주문 조회
+    const [guests, orders] = await Promise.all([
+      Events.findGuests({
+        eventId: validateReq.data.params.eventId
+      }),
+      Events.findOrders({ eventId: validateReq.data.params.eventId })
+    ]);
     // 아무런 게스트가 없으면 메시지 보내지 않음
     if (!!guests === false || guests.length === 0) {
       return res.status(200).send();
@@ -323,7 +325,9 @@ export async function sendMsgToGuests(req: Request, res: Response) {
           return currentData.type === EN_WORK_TYPE.WORK;
         }, false);
         log('haveWork: ', haveWork, guest);
-        if (haveWork === true) {
+        // 이미 주문을 했는지 확인한다.
+        const haveOrder = orders.findIndex(fv => fv.guest_id === guest.id) >= 0;
+        if (haveWork === true && haveOrder === false) {
           // 메시지 발송
           await bot.chat.postMessage({
             token,
