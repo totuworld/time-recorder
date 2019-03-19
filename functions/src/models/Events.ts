@@ -217,7 +217,7 @@ class EventType {
     const oldOrderDoc = orderCollection.doc(oldOrder.id);
     await oldOrderDoc.update({
       beverage_id: args.order.beverage_id,
-      option: args.order.option
+      option: !!args.order.option ? args.order.option : ''
     });
     return {
       ...args.order,
