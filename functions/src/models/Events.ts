@@ -102,7 +102,7 @@ class EventType {
       return {
         id: result.id,
         title: args.title,
-        desc: args.title,
+        desc: args.desc,
         private: args.private,
         last_order: args.last_order,
         owner_id: args.owner.id,

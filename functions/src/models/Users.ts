@@ -172,7 +172,6 @@ export class UsersType {
   async findAllSlackUserInfo() {
     const searchSnap = await this.SlackUsersStore.get();
     const userInfos = searchSnap.docs.map(doc => {
-      console.log(doc.data());
       return doc.data() as ISlackUserInfo;
     });
     return userInfos;
