@@ -196,33 +196,15 @@ class EventType {
     // 주문 마감 여부는 이미 체크했다는 전제
     const orderCollection = this.OrdersCollection(args.eventId);
 
-    // 기존에 주문한 사항있는지 확인한다.
-    const oldOrder = await orderCollection.doc(args.order.guest_id).get();
-
-    // 기존 주문이 없다면 추가한다.
-    if (oldOrder.exists === false) {
-      const oldDoc = orderCollection.doc(args.order.guest_id);
-      await oldDoc.set({
-        ...args.order,
-        id: args.order.guest_id
-      });
-      return {
-        ...args.order,
-        id: args.order.guest_id,
-        docId: args.order.guest_id
-      } as OrderWithDocID;
-    }
-
-    // 기존 주문이 있으니 변경하자.
-    const oldOrderDoc = orderCollection.doc(oldOrder.id);
-    await oldOrderDoc.update({
-      beverage_id: args.order.beverage_id,
-      option: !!args.order.option ? args.order.option : ''
+    const oldDoc = orderCollection.doc(args.order.guest_id);
+    await oldDoc.set({
+      ...args.order,
+      id: args.order.guest_id
     });
     return {
       ...args.order,
-      id: oldOrder.id,
-      docId: oldOrder.id
+      id: args.order.guest_id,
+      docId: args.order.guest_id
     } as OrderWithDocID;
   }
 }

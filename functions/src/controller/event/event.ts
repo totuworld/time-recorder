@@ -223,9 +223,12 @@ export async function addOrder(req: Request, res: Response) {
       });
   }
   try {
-    await Events.find({
+    const info = await Events.find({
       eventId: validateReq.data.params.eventId
     });
+    if (info.closed === true) {
+      return res.status(400).send('event closed');
+    }
     const result = await Events.addOrder({
       eventId: validateReq.data.params.eventId,
       order: validateReq.data.body.order
