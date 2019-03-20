@@ -1,5 +1,7 @@
-import { Request, Response } from 'express';
 import axios from 'axios';
+import { Request, Response } from 'express';
+
+import { Users } from './models/Users';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 
 const SLACK_TOKEN = process.env.SLACK_TOKEN || 'slack_token';
@@ -16,20 +18,24 @@ export async function addDatas(req: Request, res: Response) {
       !!fv.profile.email &&
       /yanolja\.com/g.test(fv.profile.email)
   );
+  const allLoginUsers = await Users.findAllLoginUser();
   const ref = FireabaseAdmin.Firestore.collection('slack_users');
   const promises = filterdUsers.map(async mv => {
-    console.log(mv.id);
-    return await ref.doc(mv.id).set({
+    const findLoginUserInfo = allLoginUsers.find(fv => fv.id === mv.id);
+    const setValue = {
       id: mv.id,
       email: mv.profile.email,
       name: mv.name,
       real_name: mv.real_name,
       profile_url: mv.profile.image_72
-    });
+    };
+    if (!!findLoginUserInfo) {
+      setValue['auth_id'] = findLoginUserInfo.auth_id;
+    }
+    return await ref.doc(mv.id).set(setValue);
   });
   const refRdb = FireabaseAdmin.Database.ref('users');
   const rdb_promises = filterdUsers.map(async mv => {
-    console.log(mv.id);
     return refRdb.child(mv.id).set({
       id: mv.id,
       email: mv.profile.email,
