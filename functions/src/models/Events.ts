@@ -3,7 +3,6 @@ import debug from 'debug';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { IEvent, IEventOrder } from './interface/IEvent';
 import { IUsersItem } from './interface/IUsers';
-import { updateAllUsersOverWorkTimeTodayWorkker } from '../functions';
 
 type UserItemWithDocID = IUsersItem & { docId: string };
 type OrderWithDocID = IEventOrder & { docId: string };
@@ -193,6 +192,10 @@ class EventType {
       log('findOrders - cache get');
       return this.orders.get(eventId);
     }
+    return this.updateCache({eventId});
+  }
+
+  async updateCache({ eventId }: { eventId: string }) {
     const orderCollection = this.OrdersCollection(eventId);
     const allQueueSnap = await orderCollection.get();
     const datas = allQueueSnap.docs.map(mv => {
@@ -223,10 +226,12 @@ class EventType {
       docId: args.order.guest_id
     } as OrderWithDocID;
     if (this.orders.has(args.eventId) === false) {
-      await this.findOrders({eventId: args.eventId});
+      await this.findOrders({ eventId: args.eventId });
     }
     const updateArr = this.orders.get(args.eventId);
-    const findIdx = updateArr.findIndex(fv => fv.guest_id === args.order.guest_id);
+    const findIdx = updateArr.findIndex(
+      fv => fv.guest_id === args.order.guest_id
+    );
     // 이미 주문한 내용이 있는가?
     if (findIdx >= 0) {
       updateArr[findIdx] = returnData;
@@ -235,6 +240,22 @@ class EventType {
     }
     this.orders.set(args.eventId, updateArr);
     return returnData;
+  }
+
+  async removeOrder(args: { eventId: string; guestId: string }) {
+    // 주문 마감 여부는 이미 체크했다는 전제
+    if (this.orders.has(args.eventId) === false) {
+      await this.findOrders({ eventId: args.eventId });
+    }
+    const updateArr = this.orders.get(args.eventId);
+    const findIdx = updateArr.findIndex(fv => fv.guest_id === args.guestId);
+    // 주문이 있을 때만!
+    if (findIdx >= 0) {
+      await this.OrdersCollection(args.eventId)
+        .doc(args.guestId)
+        .delete();
+      await this.updateCache({eventId: args.eventId});
+    }
   }
 }
 

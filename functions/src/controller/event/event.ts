@@ -3,13 +3,17 @@ import { Request, Response } from 'express';
 
 import { WebClient } from '@slack/client';
 
+import { EN_WORK_TYPE } from '../../contants/enum/EN_WORK_TYPE';
 import { Events } from '../../models/Events';
+import { LogData } from '../../models/interface/SlackSlashCommand';
+import { WorkLog } from '../../models/WorkLog';
 import { Util } from '../../services/util';
 import { IAddEventReq } from './interface/IAddEventReq';
 import { IAddGuestsReq } from './interface/IAddGuestsReq';
 import { IAddOrderReq } from './interface/IAddOrderReq';
 import { IFindAllEventReq } from './interface/IFindAllEventReq';
 import { IFindEventReq } from './interface/IFindEventReq';
+import { IRemoveOrderReq } from './interface/IRemoveOrderReq';
 import { ISendMsgToGuestsReq } from './interface/ISendMsgToGuestsReq';
 import { IUpdateEventReq } from './interface/IUpdateEventReq';
 import { JSCAddEvent } from './jsc/JSCAddEvent';
@@ -17,11 +21,9 @@ import { JSCAddGuests } from './jsc/JSCAddGuests';
 import { JSCAddOrder } from './jsc/JSCAddOrder';
 import { JSCFindAllEvent } from './jsc/JSCFindAllEvent';
 import { JSCFindEvent } from './jsc/JSCFindEvent';
+import { JSCRemoveOrder } from './jsc/JSCRemoveOrder';
 import { JSCSendMsgToGuests } from './jsc/JSCSendMsgToGuests';
 import { JSCUpdateEvent } from './jsc/JSCUpdateEvent';
-import { WorkLog } from '../../models/WorkLog';
-import { LogData } from '../../models/interface/SlackSlashCommand';
-import { EN_WORK_TYPE } from '../../contants/enum/EN_WORK_TYPE';
 
 const log = debug('tr:event');
 
@@ -239,6 +241,38 @@ export async function addOrder(req: Request, res: Response) {
   }
 }
 
+export async function deleteOrder(req: Request, res: Response) {
+  const validateReq = Util.validateParamWithData<IRemoveOrderReq>(
+    {
+      params: req.params
+    },
+    JSCRemoveOrder
+  );
+  if (validateReq.result === false) {
+    return res
+      .contentType('json')
+      .status(400)
+      .send({
+        text: validateReq.errorMessage
+      });
+  }
+  try {
+    const info = await Events.find({
+      eventId: validateReq.data.params.eventId
+    });
+    if (info.closed === true) {
+      return res.status(400).send('event closed');
+    }
+    await Events.removeOrder({
+      eventId: validateReq.data.params.eventId,
+      guestId: validateReq.data.params.guestId
+    });
+    return res.send();
+  } catch (err) {
+    return res.status(500).send(err.toString());
+  }
+}
+
 export async function findOrders(req: Request, res: Response) {
   const validateReq = Util.validateParamWithData<IFindEventReq>(
     {
@@ -358,6 +392,12 @@ export async function sendMsgToGuests(req: Request, res: Response) {
         }
       }
     }
+    console.log(
+      JSON.stringify({
+        source: 'sendMsgToGuests',
+        req: { originalUrl: req.originalUrl, query: req.query }
+      })
+    );
     return res.status(200).send();
   } catch (err) {
     return res.status(404).send();

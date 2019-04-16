@@ -8,6 +8,7 @@ import {
   addEvent,
   addGuests,
   addOrder,
+  deleteOrder,
   findAllEvent,
   findEvent,
   findGuests,
@@ -118,6 +119,7 @@ function routeList() {
   router.get('/events/:eventId/guests', findGuests);
   router.post('/events/:eventId/guests/msg', sendMsgToGuests);
   router.post('/events/:eventId/orders', addOrder);
+  router.delete('/events/:eventId/orders/:guestId', deleteOrder);
   router.get('/events/:eventId/orders', findOrders);
 
   router.post('/beverages', addBeverage);
