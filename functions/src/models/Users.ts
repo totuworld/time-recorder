@@ -10,10 +10,12 @@ import {
 } from './interface/IUsers';
 // const log = debug("tr:Users");
 export class UsersType {
+  private userList: ISlackUserInfo[];
   constructor() {
     if (FireabaseAdmin.isInit === false) {
       FireabaseAdmin.bootstrap();
     }
+    this.userList = [];
   }
   /** groups root store */
   get GroupRoot() {
@@ -170,12 +172,22 @@ export class UsersType {
     return userInfoSnap.data() as ISlackUserInfo;
   }
   async findAllSlackUserInfo() {
+    // 캐시되는 정보가 있으면 이를 사용한다.
+    if (this.userList.length > 0) {
+      return this.userList;
+    }
+    return await this.refreshUserList();
+  }
+
+  async refreshUserList() {
     const searchSnap = await this.SlackUsersStore.get();
     const userInfos = searchSnap.docs.map(doc => {
       return doc.data() as ISlackUserInfo;
     });
-    return userInfos;
+    this.userList = userInfos;
+    return this.userList;
   }
+
   async findUserQueue({ userUid }: { userUid: string }) {
     const queueRef = this.UserStoreQueueRef(userUid);
     const allQueueSnap = await queueRef.get();

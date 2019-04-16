@@ -49,6 +49,8 @@ export async function addDatas(req: Request, res: Response) {
     const promiseFunc = total.pop();
     await promiseFunc;
   }
+  // 사용자 리스트 cache 업데이트
+  await Users.refreshUserList();
   res.send();
 }
 export async function addUserToRealTime(req: Request, res: Response) {

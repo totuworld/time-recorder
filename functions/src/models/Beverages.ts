@@ -8,10 +8,12 @@ type BeveragesWithID = IBeverage & { id: string };
 const log = debug('tr:Beverages');
 class BeveragesType {
   private BEVERAGE_NAMES = 'names';
+  private beverages: BeveragesWithID[];
   constructor() {
     if (FireabaseAdmin.isInit === false) {
       FireabaseAdmin.bootstrap();
     }
+    this.beverages = [];
   }
   get BeveragesStore() {
     const ref = FireabaseAdmin.Firestore.collection('beverages');
@@ -24,6 +26,9 @@ class BeveragesType {
 
   /** 음료 전체 조회 */
   async findAll(): Promise<BeveragesWithID[]> {
+    if (this.beverages.length > 0) {
+      return this.beverages;
+    }
     const snaps = await this.BeveragesStore.get();
     const datas = snaps.docs
       .filter(fv => fv.id !== this.BEVERAGE_NAMES)
@@ -34,7 +39,27 @@ class BeveragesType {
         } as BeveragesWithID;
         return returnData;
       });
-    return datas;
+    this.beverages = datas;
+    return this.beverages;
+  }
+
+  async addToCache(data: BeveragesWithID) {
+    if (this.beverages.length > 0) {
+      this.beverages.push(data);
+      return this.beverages;
+    }
+    const snaps = await this.BeveragesStore.get();
+    const datas = snaps.docs
+      .filter(fv => fv.id !== this.BEVERAGE_NAMES)
+      .map(mv => {
+        const returnData = {
+          ...mv.data(),
+          id: mv.id
+        } as BeveragesWithID;
+        return returnData;
+      });
+    this.beverages = [...datas, data];
+    return this.beverages;
   }
 
   /** 음료 조회 */
@@ -70,10 +95,12 @@ class BeveragesType {
       const nameArr = namesDoc.data() as {
         names: { title: string; id: string }[];
       };
+      const addData = { title: args.title, id: result.id };
       const newNameArr = [
         ...nameArr.names,
         { title: args.title, id: result.id }
       ];
+      await this.addToCache(addData);
       await this.BeverageDoc(this.BEVERAGE_NAMES).update({ names: newNameArr });
     }
     return {

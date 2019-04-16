@@ -3,16 +3,22 @@ import debug from 'debug';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { IEvent, IEventOrder } from './interface/IEvent';
 import { IUsersItem } from './interface/IUsers';
+import { updateAllUsersOverWorkTimeTodayWorkker } from '../functions';
 
 type UserItemWithDocID = IUsersItem & { docId: string };
 type OrderWithDocID = IEventOrder & { docId: string };
 
 const log = debug('tr:Events');
 class EventType {
+  private orders: Map<string, OrderWithDocID[]>;
+  private guests: Map<string, UserItemWithDocID[]>;
+
   constructor() {
     if (FireabaseAdmin.isInit === false) {
       FireabaseAdmin.bootstrap();
     }
+    this.orders = new Map();
+    this.guests = new Map();
   }
   get EventsStore() {
     const ref = FireabaseAdmin.Firestore.collection('events');
@@ -144,6 +150,9 @@ class EventType {
 
   /** 참가자 목록 */
   async findGuests({ eventId }: { eventId: string }) {
+    if (this.guests.has(eventId)) {
+      return this.guests.get(eventId);
+    }
     const guestCollection = this.GuestsCollection(eventId);
     const allQueueSnap = await guestCollection.get();
     const datas = allQueueSnap.docs.map(mv => {
@@ -153,6 +162,7 @@ class EventType {
       } as UserItemWithDocID;
       return returnData;
     });
+    this.guests.set(eventId, datas);
     return datas;
   }
 
@@ -179,6 +189,10 @@ class EventType {
 
   /** 주문 목록 */
   async findOrders({ eventId }: { eventId: string }) {
+    if (this.orders.has(eventId)) {
+      log('findOrders - cache get');
+      return this.orders.get(eventId);
+    }
     const orderCollection = this.OrdersCollection(eventId);
     const allQueueSnap = await orderCollection.get();
     const datas = allQueueSnap.docs.map(mv => {
@@ -188,6 +202,8 @@ class EventType {
       } as OrderWithDocID;
       return returnData;
     });
+    log('findOrders - cache set');
+    this.orders.set(eventId, datas);
     return datas;
   }
 
@@ -201,11 +217,24 @@ class EventType {
       ...args.order,
       id: args.order.guest_id
     });
-    return {
+    const returnData = {
       ...args.order,
       id: args.order.guest_id,
       docId: args.order.guest_id
     } as OrderWithDocID;
+    if (this.orders.has(args.eventId) === false) {
+      await this.findOrders({eventId: args.eventId});
+    }
+    const updateArr = this.orders.get(args.eventId);
+    const findIdx = updateArr.findIndex(fv => fv.guest_id === args.order.guest_id);
+    // 이미 주문한 내용이 있는가?
+    if (findIdx >= 0) {
+      updateArr[findIdx] = returnData;
+    } else {
+      updateArr.push(returnData);
+    }
+    this.orders.set(args.eventId, updateArr);
+    return returnData;
   }
 }
 
