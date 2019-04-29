@@ -17,6 +17,10 @@ import {
   updateEvent
 } from './controller/event/event';
 import {
+  addMemberToGroup,
+  deleteMemberToGroup
+} from './controller/groups/groups';
+import {
   addFuseWorkLog,
   addUserQueue,
   addWorkLog,
@@ -110,6 +114,9 @@ function routeList() {
   router.delete('/get_user/:authId/queue/:key', deleteUserQueue);
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
+
+  router.post('/groups/:groupId/:userId', addMemberToGroup);
+  router.delete('/groups/:groupId/:userId', deleteMemberToGroup);
 
   router.get('/events', findAllEvent);
   router.post('/events', addEvent);
