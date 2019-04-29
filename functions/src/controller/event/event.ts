@@ -97,6 +97,7 @@ export async function updateEvent(req: Request, res: Response) {
     },
     JSCUpdateEvent
   );
+  log(req.body);
   if (validateReq.result === false) {
     return res
       .contentType('json')
@@ -115,6 +116,7 @@ export async function updateEvent(req: Request, res: Response) {
       ...validateReq.data.body,
       eventId: validateReq.data.params.eventId
     };
+    log(validateReq.data.body);
     const result = await Events.update(reqParams);
     return res.status(200).send(result);
   } catch (err) {
