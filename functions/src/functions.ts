@@ -14,6 +14,7 @@ import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
 import { Request, Response } from 'express';
 import { TimeRecord } from './models/TimeRecord';
+import { Groups } from './models/Groups';
 const commandSet = {
   WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
   BYEBYE: new Set(['퇴근', 'ㅌㄱ', 'bye']),
@@ -1077,4 +1078,60 @@ export async function deleteUserQueue(req: Request, res: Response) {
 export async function getAllSlackUserInfo(_: Request, res: Response) {
   const datas = await Users.findAllSlackUserInfo();
   return res.json(datas);
+}
+
+const viewerUrl: string = process.env.VIEWER_URL
+  ? process.env.VIEWER_URL
+  : 'http://localhost:3000';
+
+export async function newMsgAction(request: Request, response: Response) {
+  if (request.method !== 'POST') {
+    console.error(`Got unsupported ${request.method} request. Expected POST.`);
+    return response.status(405).send('Only POST requests are accepted');
+  }
+  if (!!request.body === false || !!request.body.payload === false) {
+    return response.status(401).send('Bad formatted action response');
+  }
+
+  const action = JSON.parse(request.body.payload) as SlackActionInvocation;
+  const firstAction = action.actions[0];
+
+  const now = new Date();
+  now.setHours(now.getHours() + now.getTimezoneOffset() / -60);
+  const today = now.toJSON().substr(0, 10);
+
+  // po인가?
+  if (firstAction.value === 'cxpo') {
+    response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: `CXPO 등록 완료\n워크로그 주소\n${viewerUrl}/records/${
+          action.user.id
+        }?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+      });
+    return await Groups.addMemberToGroup({
+      group_id: 'cxpo',
+      user_id: action.user.id
+    });
+  }
+
+  // dev인가?
+  if (firstAction.value === 'cxdev') {
+    response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: `CXDEV 등록 완료\n워크로그 주소\n${viewerUrl}/records/${
+          action.user.id
+        }?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+      });
+    return await Groups.addMemberToGroup({
+      group_id: 'cxdev',
+      user_id: action.user.id
+    });
+  }
+  return response.status(201).send({
+    text: '수신 완료'
+  });
 }

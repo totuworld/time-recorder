@@ -15,7 +15,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@slack/client": "^4.11.0",
+    "@slack/client": "^5.0.1",
     "ajv": "^6.10.0",
     "axios": "^0.18.0",
     "body-parser": "^1.18.3",
@@ -37,7 +37,7 @@
     "shelljs": "^0.8.2",
     "ts-node": "^7.0.0",
     "tslint": "^5.8.0",
-    "typescript": "^2.5.3",
+    "typescript": "^3.4.5",
     "typescript-json-schema": "^0.36.0",
     "typescript-tslint-plugin": "^0.3.1"
   },

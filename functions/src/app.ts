@@ -2,7 +2,7 @@ import * as bodyParser from 'body-parser';
 // express로 사용되는 app
 import express from 'express';
 
-import { addDatas } from './addUsers';
+import { addDatas, addUser } from './addUsers';
 import { addBeverage, findAllBeverage } from './controller/beverage/beverage';
 import {
   addEvent,
@@ -40,8 +40,8 @@ import {
   getHolidays,
   getUser,
   getUserQueue,
-  messageAction,
   modify,
+  newMsgAction,
   storeOverWorkTime,
   updateAllUsersOverWorkTime,
   updateAllUsersOverWorkTimeTodayWorkker,
@@ -75,7 +75,7 @@ function routeList() {
   router.get('/get_groups', getGroups);
   router.get('/get_group_infos', getAllGroupInfo);
   router.get('/get_user', getUser);
-  router.post('/message_action', messageAction);
+  router.post('/message_action', newMsgAction);
   router.post('/update_record', modify);
   router.post('/add_login_user', async (req, res) => {
     const userUid = req.body['userUid'];
@@ -114,6 +114,7 @@ function routeList() {
   router.delete('/get_user/:authId/queue/:key', deleteUserQueue);
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
+  router.post('/here_comes_new/:user_slack_id', addUser);
 
   router.post('/groups/:groupId/:userId', addMemberToGroup);
   router.delete('/groups/:groupId/:userId', deleteMemberToGroup);

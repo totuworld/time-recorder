@@ -3,8 +3,11 @@ import { Request, Response } from 'express';
 
 import { Users } from './models/Users';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
+import { WebClient } from '@slack/client';
+import { ISlackUser } from './models/interface/SlackSlashCommand';
 
 const SLACK_TOKEN = process.env.SLACK_TOKEN || 'slack_token';
+const client = new WebClient(SLACK_TOKEN);
 
 export async function addDatas(req: Request, res: Response) {
   const resp = await axios.get(
@@ -81,4 +84,23 @@ export async function addUserToRealTime(req: Request, res: Response) {
     await promiseFunc;
   }
   res.send();
+}
+
+export async function addUser(req: Request, res: Response) {
+  // 사용자 조회
+  const id: string = req.params.user_slack_id;
+  const info = await client.users.info({ user: id });
+  if (info.ok) {
+    const user: ISlackUser = info.user as ISlackUser;
+    const refRdb = FireabaseAdmin.Database.ref('users');
+    await refRdb.child(user.id).set({
+      id: user.id,
+      email: user.profile.email,
+      name: user.name,
+      real_name: user.real_name,
+      profile_url: user.profile.image_72
+    });
+    return res.send();
+  }
+  return res.status(404).send();
 }
