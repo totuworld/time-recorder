@@ -21,6 +21,15 @@ import {
   deleteMemberToGroup
 } from './controller/groups/groups';
 import {
+  addRCEvent,
+  addRCGuests,
+  findAllRCEvent,
+  findRCEvent,
+  findRCGuests,
+  removeRCGuest,
+  updateRCEvent
+} from './controller/random_coffee/random_coffee';
+import {
   addFuseWorkLog,
   addUserQueue,
   addWorkLog,
@@ -132,6 +141,14 @@ function routeList() {
 
   router.post('/beverages', addBeverage);
   router.get('/beverages', findAllBeverage);
+
+  router.get('/random_coffee', findAllRCEvent);
+  router.get('/random_coffee/:eventId', findRCEvent);
+  router.post('/random_coffee', addRCEvent);
+  router.put('/random_coffee/:eventId', updateRCEvent);
+  router.post('/random_coffee/:eventId/guests', addRCGuests);
+  router.get('/random_coffee/:eventId/guests', findRCGuests);
+  router.delete('/random_coffee/:eventId/guests/:docId', removeRCGuest);
   return router;
 }
 // parse application/x-www-form-urlencoded
