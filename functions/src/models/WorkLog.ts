@@ -452,16 +452,19 @@ export class WorkLogType {
   async addFuseOverWorkTime({
     login_auth_id,
     date,
-    use
+    use,
+    note
   }: {
     login_auth_id: string;
     date: string;
     use: string;
+    note?: string;
   }) {
     const fuseOverTimeRef = this.FuseOverTimeRef(login_auth_id);
     await fuseOverTimeRef.push({
       date,
-      use
+      use,
+      note
     });
   }
   async findAllFuseOverWorkTime({

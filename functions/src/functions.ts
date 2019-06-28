@@ -290,7 +290,10 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     user_id: string; // slack id(대상자)
     target_date: string; // 등록할 날짜
     duration: string; // 얼마나 fuse할지(ISO8601 형식으로 받음 https://en.wikipedia.org/wiki/ISO_8601#Durations)
+    isVacation?: boolean; // 초과근무를 휴가로 바꾸는 요청인지 확인
+    note?: string; // 사유 같은걸 적을 때 사용
   } = request.body;
+  log(request.body);
   // 로그인 사용자 확인
   const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
   if (authInfo.result === false) {
@@ -323,8 +326,15 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     // 기록이 없으면 fail
     return res.status(400).send(`차감 가능한 초과근무가 없습니다`);
   }
+  const isVacation = Util.isNotEmpty(reqData.isVacation) && reqData.isVacation;
   // 차감을 요청한 시간만큼 전체 시간을 보유했는지 확인한다.
-  const fuseDuration = luxon.Duration.fromISO(reqData.duration);
+  // 추가로 초과근무시간 10시간으로 휴가처럼 사용하는 것인지 체크
+  const fuseDuration = isVacation
+    ? luxon.Duration.fromISO('PT10H')
+    : luxon.Duration.fromISO(reqData.duration);
+  if (isVacation === false && fuseDuration > luxon.Duration.fromISO('PT6H')) {
+    return res.status(400).send(`6시간 이상 차감은 불가능합니다`);
+  }
   const totalOverWorkDuration = overTime.reduce(
     (acc: luxon.Duration, cur: IOverWork) => {
       if (cur.over === null || cur.over === undefined) {
@@ -349,17 +359,22 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     return res.status(400).send(`차감 가능 시간을 초과한 요청입니다`);
   }
   // 사용 기록을 추가한다.
+  // 초과근무를 휴가로 사용하는 경우 10시간으로 차감한다.
   await WorkLog.addFuseOverWorkTime({
     login_auth_id: targetUser.auth_id,
     date: reqData.target_date,
-    use: reqData.duration
+    use: isVacation ? 'PT10H' : reqData.duration,
+    note: Util.isNotEmpty(reqData.note) ? reqData.note : ''
   });
   // 해당 날짜의 워크로그에 차감을 추가한다.
   const time = luxon.DateTime.fromFormat(reqData.target_date, 'yyyyLLdd');
   const timeStr = time.plus({ hours: 9 }).toISO();
+  const addDuration = isVacation
+    ? luxon.Duration.fromISO('PT8H')
+    : luxon.Duration.fromISO(reqData.duration);
   const doneStr = time
     .plus({ hours: 9 })
-    .plus(fuseDuration)
+    .plus(addDuration)
     .toISO();
   await WorkLog.store({
     userId: targetUser.id,
