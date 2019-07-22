@@ -145,6 +145,32 @@ export async function updateRCEvent(req: Request, res: Response) {
   }
 }
 
+export async function checkUserRegister(req: Request, res: Response) {
+  const validateReq = Util.validateParamWithData<IDeleteRCGuestReq>(
+    {
+      params: req.params
+    },
+    JSCDeleteRCGuest
+  );
+  if (validateReq.result === false) {
+    return res
+      .contentType('json')
+      .status(400)
+      .send({
+        text: validateReq.errorMessage
+      });
+  }
+  try {
+    const result = await RandomCoffeeEvents.checkGuestRegister({
+      eventId: validateReq.data.params.eventId,
+      guestId: validateReq.data.params.docId
+    });
+    return res.send({ result });
+  } catch (err) {
+    return res.status(500).send(err.toString());
+  }
+}
+
 export async function addRCGuests(req: Request, res: Response) {
   const validateReq = Util.validateParamWithData<IAddGuestsReq>(
     {

@@ -30,6 +30,12 @@ class RandomCoffeeEventType {
     return this.EventsStore.doc(eventId).collection('guests');
   }
 
+  GuestDoc(eventId: string, guestId: string) {
+    return this.EventsStore.doc(eventId)
+      .collection('guests')
+      .doc(guestId);
+  }
+
   async findAll({ page, limit }: { page: number; limit: number }) {
     const allEventSnap = await this.EventsStore.get();
     const datas = allEventSnap.docs.map(mv => {
@@ -139,6 +145,18 @@ class RandomCoffeeEventType {
     const datas = await this.loadGuests(eventId);
     this.guests.set(eventId, datas);
     return datas;
+  }
+
+  /** 특정 이벤트에 특정 사용자의 참여 여부를 확인한다. */
+  async checkGuestRegister({
+    eventId,
+    guestId
+  }: {
+    eventId: string;
+    guestId: string;
+  }) {
+    const guestDocSnap = await this.GuestDoc(eventId, guestId).get();
+    return guestDocSnap.exists;
   }
 
   private async loadGuests(eventId: string) {
