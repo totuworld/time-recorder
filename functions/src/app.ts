@@ -82,8 +82,8 @@ function routeList() {
       });
   });
   router.get('/get_all', getAll);
-  router.get('/get_groups', getGroups);
-  router.get('/get_group_infos', getAllGroupInfo);
+  router.get('/get_groups', getGroups); // 그룹 안에 멤버를 반환
+  router.get('/get_group_infos', getAllGroupInfo); // 그룹의 정보를 조회
   router.get('/get_user', getUser);
   router.post('/message_action', newMsgAction);
   router.post('/update_record', modify);

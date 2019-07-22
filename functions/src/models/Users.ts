@@ -75,8 +75,12 @@ export class UsersType {
     const promises = memberIds.map(mv => {
       return this.find({ userId: mv });
     });
-    const userInfos = Promise.all(promises);
-    return userInfos;
+    const userInfos = await Promise.all(promises);
+    const memberUserInfos = Object.values(memberList);
+    return userInfos.map(info => {
+      const memberInfo = memberUserInfos.find(fv => fv.id === info.id);
+      return { ...info, ...memberInfo };
+    });
   }
 
   async findAllInGroupLoginUsers({ groupId }: { groupId: string }) {
