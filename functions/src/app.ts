@@ -23,6 +23,7 @@ import {
 import {
   addRCEvent,
   addRCGuests,
+  checkUserRegister,
   findAllRCEvent,
   findRCEvent,
   findRCGuests,
@@ -148,6 +149,10 @@ function routeList() {
   router.put('/random_coffee/:eventId', updateRCEvent);
   router.post('/random_coffee/:eventId/guests', addRCGuests);
   router.get('/random_coffee/:eventId/guests', findRCGuests);
+  router.get(
+    '/random_coffee/:eventId/guests/:docId/check_register',
+    checkUserRegister
+  );
   router.delete('/random_coffee/:eventId/guests/:docId', removeRCGuest);
   return router;
 }

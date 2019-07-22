@@ -1,20 +1,22 @@
 import debug from 'debug';
+import { Request, Response } from 'express';
 import * as luxon from 'luxon';
+
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
+import { Groups } from './models/Groups';
 import {
+  IFuseOverWork,
+  IOverWork,
   LogData,
   SlackActionInvocation,
-  SlackSlashCommand,
-  IOverWork,
-  IFuseOverWork
+  SlackSlashCommand
 } from './models/interface/SlackSlashCommand';
+import { TimeRecord } from './models/TimeRecord';
 import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
-import { Request, Response } from 'express';
-import { TimeRecord } from './models/TimeRecord';
-import { Groups } from './models/Groups';
+
 const commandSet = {
   WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
   BYEBYE: new Set(['퇴근', 'ㅌㄱ', 'bye']),
@@ -778,7 +780,7 @@ async function getTimeObj(
     userId: user_id
   });
   const haveData = Object.keys(datas).length > 0;
-  const convertData = await TimeRecord.convertWorkTime(
+  const convertData = TimeRecord.convertWorkTime(
     datas,
     startDate.toJSDate(),
     endDate.toJSDate(),
@@ -979,7 +981,7 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
   response: Response
 ) {
   const weekPtn = /[0-9]{4}-W[0-9]{2}/;
-  const { week } = request.body;
+  const { week, group_id } = request.body;
   if (week === null || week === undefined || weekPtn.test(week) === false) {
     return response
       .status(400)
@@ -987,8 +989,14 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
   }
   const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
   const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const haveGroupId =
+    !(group_id === null || group_id === undefined) &&
+    typeof group_id === 'string';
+  const getUserFunc = haveGroupId
+    ? Users.findAllInGroupLoginUsers({ groupId: group_id })
+    : Users.findAllLoginUser();
   const [users, holidayDuration] = await Promise.all([
-    Users.findAllLoginUser(),
+    getUserFunc,
     WorkLog.getHolidaysDuration(startDate, endDate)
   ]);
   const promises = users.map(async mv => {
@@ -1001,11 +1009,10 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
       startDate: today,
       endDate: today
     });
-    log(resp, mv.auth_id);
     if (!!resp === true && resp.length > 0) {
       const first = resp[0];
       let haveWork = false;
-      Object.keys(first).map(fv => {
+      Object.keys(first).forEach(fv => {
         if (
           haveWork === false &&
           Object.keys(first[fv]).map(
