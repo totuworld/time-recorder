@@ -81,6 +81,7 @@ class GroupType {
         this.findInfo({ group_id }),
         Users.find({ userId: user_id })
       ]);
+      log(group_id, groupInfo, userInfo);
       if (Util.isEmpty(groupInfo) || Util.isEmpty(userInfo)) {
         return false;
       }

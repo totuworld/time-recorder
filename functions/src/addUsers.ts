@@ -89,7 +89,15 @@ export async function addUserToRealTime(req: Request, res: Response) {
 export async function addUser(req: Request, res: Response) {
   // 사용자 조회
   const id: string = req.params.user_slack_id;
-  const info = await client.users.info({ user: id });
+  const info = await addUserByUserID(id);
+  if (info) {
+    return res.send();
+  }
+  return res.status(404).send();
+}
+
+export async function addUserByUserID(user_id: string) {
+  const info = await client.users.info({ user: user_id });
   if (info.ok) {
     const user: ISlackUser = info.user as ISlackUser;
     const refRdb = FireabaseAdmin.Database.ref('users');
@@ -100,7 +108,7 @@ export async function addUser(req: Request, res: Response) {
       real_name: user.real_name,
       profile_url: user.profile.image_72
     });
-    return res.send();
+    return true;
   }
-  return res.status(404).send();
+  return false;
 }

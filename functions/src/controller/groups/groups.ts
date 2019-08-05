@@ -1,9 +1,12 @@
 import debug from 'debug';
 import { Request, Response } from 'express';
-import { JSCAddMemberToGroupReq } from './jsc/JSCAddMemberToGroupReq';
+
+import { addUserByUserID } from '../../addUsers';
+import { Groups } from '../../models/Groups';
+import { Users } from '../../models/Users';
 import { Util } from '../../services/util';
 import { IAddMemberToGroupReq } from './interface/IAddMemberToGroupReq';
-import { Groups } from '../../models/Groups';
+import { JSCAddMemberToGroupReq } from './jsc/JSCAddMemberToGroupReq';
 
 const log = debug('tr:groupsController');
 
@@ -23,6 +26,15 @@ export async function addMemberToGroup(req: Request, res: Response) {
       });
   }
   try {
+    const userInfo = await Users.find({
+      userId: validateReq.data.params.userId
+    });
+    if (!!userInfo === false) {
+      const addUser = await addUserByUserID(validateReq.data.params.userId);
+      if (addUser === false) {
+        return res.status(404).send(false);
+      }
+    }
     const result = await Groups.addMemberToGroup({
       group_id: validateReq.data.params.groupId,
       user_id: validateReq.data.params.userId
