@@ -2,6 +2,8 @@ import debug from 'debug';
 import { Request, Response } from 'express';
 import * as luxon from 'luxon';
 
+import { WebClient } from '@slack/client';
+
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
 import { Groups } from './models/Groups';
 import {
@@ -16,6 +18,9 @@ import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
+
+const SLACK_TOKEN = process.env.SLACK_TOKEN || 'slack_token';
+const slackClient = new WebClient(SLACK_TOKEN);
 
 const commandSet = {
   WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
@@ -160,12 +165,14 @@ export async function addWorkLog(request, res) {
   if (authInfo.data.id !== reqData.user_id && !!authInfo.data.auth === false) {
     return res.status(401).send('unauthorized');
   }
+
+  const target_date = !!reqData.target_date
+    ? reqData.target_date
+    : luxon.DateTime.local().toFormat('yyyy-LL-dd');
+  const targetDay = luxon.DateTime.fromISO(target_date);
+
   // 관리자가 아니라면 해당 주의 기록이 완료된 상태인지 확인한다.
   if (!!authInfo.data.auth === false) {
-    const target_date = !!reqData.target_date
-      ? reqData.target_date
-      : luxon.DateTime.local().toFormat('yyyy-LL-dd');
-    const targetDay = luxon.DateTime.fromISO(target_date);
     // 일요일인가?
     const week =
       targetDay.weekday !== 7
@@ -226,6 +233,67 @@ export async function addWorkLog(request, res) {
         type: reqData.type,
         timeStr: reqData.time,
         targetDate: reqData.target_date
+      });
+    }
+  }
+
+  // 출근 로그 일 때
+  // 지난주 정산 기록이 없고,
+  // 지난주 근무 시간이 부족하면, 슬랙 메시지를 보낸다.
+  if (
+    reqData.type === EN_WORK_TYPE.WORK ||
+    reqData.type === EN_WORK_TYPE.REMOTE
+  ) {
+    const lastWeek =
+      targetDay.weekday !== 7
+        ? targetDay
+            .minus({ week: 1 })
+            .toISOWeekDate()
+            .substr(0, 8)
+        : targetDay
+            .minus({ week: 1 })
+            .plus({ days: 1 })
+            .toISOWeekDate()
+            .substr(0, 8);
+    const data = await WorkLog.findWeekOverWorkTime({
+      login_auth_id: reqData.auth_user_id,
+      weekKey: lastWeek
+    });
+    log({ data });
+    // 정산 데이터가 있는가?
+    if ((data === null || data === undefined) === false) {
+      return res.send();
+    }
+    const weekStartDay = luxon.DateTime.local()
+      .set({ weekday: 1 })
+      .minus({ days: 1 })
+      .minus({ week: 1 });
+    const weekEndDay = luxon.DateTime.local()
+      .set({ weekday: 6 })
+      .minus({ week: 1 });
+    // 정산 기록이 없다면. 전체 근무 시간을 확인하자.
+    const holidayDuration = await WorkLog.getHolidaysDuration(
+      weekStartDay,
+      weekEndDay
+    );
+    const time = await getTimeObj(
+      lastWeek,
+      reqData.user_id,
+      reqData.auth_user_id,
+      holidayDuration
+    );
+    // 근무 기록이 있고 시간이 - 인지 확인!
+    if (time.haveData === true && time.timeObj.milliseconds < 0) {
+      await slackClient.chat.postMessage({
+        channel: reqData.user_id,
+        username: '워크로그',
+        text: '지난주 근무 시간이 부족합니다. 확인해보세요.',
+        attachments: [
+          {
+            title: '바로가기',
+            title_link: `https://yanolja-cx-work-log.now.sh/records/${reqData.user_id}?startDate=${weekStartDay.toFormat('yyyy-LL-dd')}&endDate=${weekEndDay.toFormat('yyyy-LL-dd')}`,
+          }
+        ]
       });
     }
   }
@@ -1128,9 +1196,7 @@ export async function newMsgAction(request: Request, response: Response) {
       .contentType('json')
       .status(200)
       .send({
-        text: `CXPO 등록 완료\n워크로그 주소\n${viewerUrl}/records/${
-          action.user.id
-        }?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+        text: `CXPO 등록 완료\n워크로그 주소\n${viewerUrl}/records/${action.user.id}?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
       });
     return await Groups.addMemberToGroup({
       group_id: 'cxpo',
@@ -1144,9 +1210,7 @@ export async function newMsgAction(request: Request, response: Response) {
       .contentType('json')
       .status(200)
       .send({
-        text: `CXDEV 등록 완료\n워크로그 주소\n${viewerUrl}/records/${
-          action.user.id
-        }?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+        text: `CXDEV 등록 완료\n워크로그 주소\n${viewerUrl}/records/${action.user.id}?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
       });
     return await Groups.addMemberToGroup({
       group_id: 'cxdev',
