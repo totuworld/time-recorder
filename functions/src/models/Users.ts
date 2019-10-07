@@ -75,9 +75,33 @@ export class UsersType {
     const promises = memberIds.map(mv => {
       return this.find({ userId: mv });
     });
-    const userInfos = Promise.all(promises);
-    return userInfos;
+    const userInfos = await Promise.all(promises);
+    const memberUserInfos = Object.values(memberList);
+    return userInfos.map(info => {
+      const memberInfo = memberUserInfos.find(fv => fv.id === info.id);
+      return { ...info, ...memberInfo };
+    });
   }
+
+  async findAllInGroupLoginUsers({ groupId }: { groupId: string }) {
+    const memberList = await this.groupMemberList({ groupId });
+    if (!!memberList === false) {
+      return [];
+    }
+    const memberIds = Object.keys(memberList);
+    const loginMemberList = await this.findAllLoginUser();
+    const slackUserInfos = memberIds
+      .map(mv => {
+        const idx = loginMemberList.findIndex(fv => fv.id === mv);
+        if (idx > -1) {
+          return loginMemberList[idx];
+        }
+        return null;
+      })
+      .filter(fv => fv !== null);
+    return slackUserInfos;
+  }
+
   async findAllGroupInfo() {
     const groupInfoRef = this.GroupInfoRoot;
     const snap = await groupInfoRef.once('value');
@@ -143,11 +167,11 @@ export class UsersType {
   async findAllLoginUser() {
     const loginUserRef = this.LoginUsersRoot;
     const snap = await loginUserRef.once('value');
-    const findUsers = snap.val() as { [key: string]: ILoginUserInfo };
+    const findUsers = snap.val() as { [key: string]: ISlackUserInfo };
     if (!!findUsers === false) {
       return [];
     }
-    const returnValue = Object.keys(findUsers).map(key => {
+    const returnValue: ISlackUserInfo[] = Object.keys(findUsers).map(key => {
       return {
         auth_id: key,
         ...findUsers[key]

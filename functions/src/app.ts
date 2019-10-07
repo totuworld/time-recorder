@@ -2,7 +2,7 @@ import * as bodyParser from 'body-parser';
 // express로 사용되는 app
 import express from 'express';
 
-import { addDatas } from './addUsers';
+import { addDatas, addUser } from './addUsers';
 import { addBeverage, findAllBeverage } from './controller/beverage/beverage';
 import {
   addEvent,
@@ -20,6 +20,16 @@ import {
   addMemberToGroup,
   deleteMemberToGroup
 } from './controller/groups/groups';
+import {
+  addRCEvent,
+  addRCGuests,
+  checkUserRegister,
+  findAllRCEvent,
+  findRCEvent,
+  findRCGuests,
+  removeRCGuest,
+  updateRCEvent
+} from './controller/random_coffee/random_coffee';
 import {
   addFuseWorkLog,
   addUserQueue,
@@ -40,8 +50,8 @@ import {
   getHolidays,
   getUser,
   getUserQueue,
-  messageAction,
   modify,
+  newMsgAction,
   storeOverWorkTime,
   updateAllUsersOverWorkTime,
   updateAllUsersOverWorkTimeTodayWorkker,
@@ -72,10 +82,10 @@ function routeList() {
       });
   });
   router.get('/get_all', getAll);
-  router.get('/get_groups', getGroups);
-  router.get('/get_group_infos', getAllGroupInfo);
+  router.get('/get_groups', getGroups); // 그룹 안에 멤버를 반환
+  router.get('/get_group_infos', getAllGroupInfo); // 그룹의 정보를 조회
   router.get('/get_user', getUser);
-  router.post('/message_action', messageAction);
+  router.post('/message_action', newMsgAction);
   router.post('/update_record', modify);
   router.post('/add_login_user', async (req, res) => {
     const userUid = req.body['userUid'];
@@ -114,6 +124,7 @@ function routeList() {
   router.delete('/get_user/:authId/queue/:key', deleteUserQueue);
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
+  router.post('/here_comes_new/:user_slack_id', addUser);
 
   router.post('/groups/:groupId/:userId', addMemberToGroup);
   router.delete('/groups/:groupId/:userId', deleteMemberToGroup);
@@ -131,6 +142,18 @@ function routeList() {
 
   router.post('/beverages', addBeverage);
   router.get('/beverages', findAllBeverage);
+
+  router.get('/random_coffee', findAllRCEvent);
+  router.get('/random_coffee/:eventId', findRCEvent);
+  router.post('/random_coffee', addRCEvent);
+  router.put('/random_coffee/:eventId', updateRCEvent);
+  router.post('/random_coffee/:eventId/guests', addRCGuests);
+  router.get('/random_coffee/:eventId/guests', findRCGuests);
+  router.get(
+    '/random_coffee/:eventId/guests/:docId/check_register',
+    checkUserRegister
+  );
+  router.delete('/random_coffee/:eventId/guests/:docId', removeRCGuest);
   return router;
 }
 // parse application/x-www-form-urlencoded

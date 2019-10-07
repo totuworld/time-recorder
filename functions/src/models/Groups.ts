@@ -67,6 +67,11 @@ class GroupType {
     return childDatas;
   }
 
+  async findGroupMemberListArr({ groupId }: { groupId: string }) {
+    const result = await this.findGroupMemberList({ groupId });
+    return Object.values(result);
+  }
+
   /** 그룹에 멤버 추가 */
   async addMemberToGroup(args: { user_id: string; group_id: string }) {
     try {
@@ -76,6 +81,7 @@ class GroupType {
         this.findInfo({ group_id }),
         Users.find({ userId: user_id })
       ]);
+      log(group_id, groupInfo, userInfo);
       if (Util.isEmpty(groupInfo) || Util.isEmpty(userInfo)) {
         return false;
       }

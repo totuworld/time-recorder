@@ -1,19 +1,27 @@
 import debug from 'debug';
+import { Request, Response } from 'express';
 import * as luxon from 'luxon';
+
+import { WebClient } from '@slack/client';
+
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from './contants/enum/EN_WORK_TYPE';
+import { Groups } from './models/Groups';
 import {
+  IFuseOverWork,
+  IOverWork,
   LogData,
   SlackActionInvocation,
-  SlackSlashCommand,
-  IOverWork,
-  IFuseOverWork
+  SlackSlashCommand
 } from './models/interface/SlackSlashCommand';
+import { TimeRecord } from './models/TimeRecord';
 import { Users } from './models/Users';
 import { WorkLog } from './models/WorkLog';
 import { FireabaseAdmin } from './services/FirebaseAdmin';
 import { Util } from './util';
-import { Request, Response } from 'express';
-import { TimeRecord } from './models/TimeRecord';
+
+const SLACK_TOKEN = process.env.SLACK_TOKEN || 'slack_token';
+const slackClient = new WebClient(SLACK_TOKEN);
+
 const commandSet = {
   WORK: new Set(['출근', 'ㅊㄱ', 'ㅊㅊ', 'hi']),
   BYEBYE: new Set(['퇴근', 'ㅌㄱ', 'bye']),
@@ -157,12 +165,14 @@ export async function addWorkLog(request, res) {
   if (authInfo.data.id !== reqData.user_id && !!authInfo.data.auth === false) {
     return res.status(401).send('unauthorized');
   }
+
+  const target_date = !!reqData.target_date
+    ? reqData.target_date
+    : luxon.DateTime.local().toFormat('yyyy-LL-dd');
+  const targetDay = luxon.DateTime.fromISO(target_date);
+
   // 관리자가 아니라면 해당 주의 기록이 완료된 상태인지 확인한다.
   if (!!authInfo.data.auth === false) {
-    const target_date = !!reqData.target_date
-      ? reqData.target_date
-      : luxon.DateTime.local().toFormat('yyyy-LL-dd');
-    const targetDay = luxon.DateTime.fromISO(target_date);
     // 일요일인가?
     const week =
       targetDay.weekday !== 7
@@ -223,6 +233,67 @@ export async function addWorkLog(request, res) {
         type: reqData.type,
         timeStr: reqData.time,
         targetDate: reqData.target_date
+      });
+    }
+  }
+
+  // 출근 로그 일 때
+  // 지난주 정산 기록이 없고,
+  // 지난주 근무 시간이 부족하면, 슬랙 메시지를 보낸다.
+  if (
+    reqData.type === EN_WORK_TYPE.WORK ||
+    reqData.type === EN_WORK_TYPE.REMOTE
+  ) {
+    const lastWeek =
+      targetDay.weekday !== 7
+        ? targetDay
+            .minus({ week: 1 })
+            .toISOWeekDate()
+            .substr(0, 8)
+        : targetDay
+            .minus({ week: 1 })
+            .plus({ days: 1 })
+            .toISOWeekDate()
+            .substr(0, 8);
+    const data = await WorkLog.findWeekOverWorkTime({
+      login_auth_id: reqData.auth_user_id,
+      weekKey: lastWeek
+    });
+    log({ data });
+    // 정산 데이터가 있는가?
+    if ((data === null || data === undefined) === false) {
+      return res.send();
+    }
+    const weekStartDay = luxon.DateTime.local()
+      .set({ weekday: 1 })
+      .minus({ days: 1 })
+      .minus({ week: 1 });
+    const weekEndDay = luxon.DateTime.local()
+      .set({ weekday: 6 })
+      .minus({ week: 1 });
+    // 정산 기록이 없다면. 전체 근무 시간을 확인하자.
+    const holidayDuration = await WorkLog.getHolidaysDuration(
+      weekStartDay,
+      weekEndDay
+    );
+    const time = await getTimeObj(
+      lastWeek,
+      reqData.user_id,
+      reqData.auth_user_id,
+      holidayDuration
+    );
+    // 근무 기록이 있고 시간이 - 인지 확인!
+    if (time.haveData === true && time.timeObj.milliseconds < 0) {
+      await slackClient.chat.postMessage({
+        channel: reqData.user_id,
+        username: '워크로그',
+        text: '지난주 근무 시간이 부족합니다. 확인해보세요.',
+        attachments: [
+          {
+            title: '바로가기',
+            title_link: `https://yanolja-cx-work-log.now.sh/records/${reqData.user_id}?startDate=${weekStartDay.toFormat('yyyy-LL-dd')}&endDate=${weekEndDay.toFormat('yyyy-LL-dd')}`,
+          }
+        ]
       });
     }
   }
@@ -289,7 +360,10 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     user_id: string; // slack id(대상자)
     target_date: string; // 등록할 날짜
     duration: string; // 얼마나 fuse할지(ISO8601 형식으로 받음 https://en.wikipedia.org/wiki/ISO_8601#Durations)
+    isVacation?: boolean; // 초과근무를 휴가로 바꾸는 요청인지 확인
+    note?: string; // 사유 같은걸 적을 때 사용
   } = request.body;
+  log(request.body);
   // 로그인 사용자 확인
   const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
   if (authInfo.result === false) {
@@ -322,8 +396,15 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     // 기록이 없으면 fail
     return res.status(400).send(`차감 가능한 초과근무가 없습니다`);
   }
+  const isVacation = Util.isNotEmpty(reqData.isVacation) && reqData.isVacation;
   // 차감을 요청한 시간만큼 전체 시간을 보유했는지 확인한다.
-  const fuseDuration = luxon.Duration.fromISO(reqData.duration);
+  // 추가로 초과근무시간 10시간으로 휴가처럼 사용하는 것인지 체크
+  const fuseDuration = isVacation
+    ? luxon.Duration.fromISO('PT10H')
+    : luxon.Duration.fromISO(reqData.duration);
+  if (isVacation === false && fuseDuration > luxon.Duration.fromISO('PT6H')) {
+    return res.status(400).send(`6시간 이상 차감은 불가능합니다`);
+  }
   const totalOverWorkDuration = overTime.reduce(
     (acc: luxon.Duration, cur: IOverWork) => {
       if (cur.over === null || cur.over === undefined) {
@@ -348,17 +429,22 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     return res.status(400).send(`차감 가능 시간을 초과한 요청입니다`);
   }
   // 사용 기록을 추가한다.
+  // 초과근무를 휴가로 사용하는 경우 10시간으로 차감한다.
   await WorkLog.addFuseOverWorkTime({
     login_auth_id: targetUser.auth_id,
     date: reqData.target_date,
-    use: reqData.duration
+    use: isVacation ? 'PT10H' : reqData.duration,
+    note: Util.isNotEmpty(reqData.note) ? reqData.note : ''
   });
   // 해당 날짜의 워크로그에 차감을 추가한다.
   const time = luxon.DateTime.fromFormat(reqData.target_date, 'yyyyLLdd');
   const timeStr = time.plus({ hours: 9 }).toISO();
+  const addDuration = isVacation
+    ? luxon.Duration.fromISO('PT8H')
+    : luxon.Duration.fromISO(reqData.duration);
   const doneStr = time
     .plus({ hours: 9 })
-    .plus(fuseDuration)
+    .plus(addDuration)
     .toISO();
   await WorkLog.store({
     userId: targetUser.id,
@@ -762,7 +848,7 @@ async function getTimeObj(
     userId: user_id
   });
   const haveData = Object.keys(datas).length > 0;
-  const convertData = await TimeRecord.convertWorkTime(
+  const convertData = TimeRecord.convertWorkTime(
     datas,
     startDate.toJSDate(),
     endDate.toJSDate(),
@@ -963,7 +1049,7 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
   response: Response
 ) {
   const weekPtn = /[0-9]{4}-W[0-9]{2}/;
-  const { week } = request.body;
+  const { week, group_id } = request.body;
   if (week === null || week === undefined || weekPtn.test(week) === false) {
     return response
       .status(400)
@@ -971,8 +1057,14 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
   }
   const startDate = luxon.DateTime.fromISO(`${week}-1`).minus({ days: 1 });
   const endDate = luxon.DateTime.fromISO(`${week}-6`);
+  const haveGroupId =
+    !(group_id === null || group_id === undefined) &&
+    typeof group_id === 'string';
+  const getUserFunc = haveGroupId
+    ? Users.findAllInGroupLoginUsers({ groupId: group_id })
+    : Users.findAllLoginUser();
   const [users, holidayDuration] = await Promise.all([
-    Users.findAllLoginUser(),
+    getUserFunc,
     WorkLog.getHolidaysDuration(startDate, endDate)
   ]);
   const promises = users.map(async mv => {
@@ -985,11 +1077,10 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
       startDate: today,
       endDate: today
     });
-    log(resp, mv.auth_id);
     if (!!resp === true && resp.length > 0) {
       const first = resp[0];
       let haveWork = false;
-      Object.keys(first).map(fv => {
+      Object.keys(first).forEach(fv => {
         if (
           haveWork === false &&
           Object.keys(first[fv]).map(
@@ -1077,4 +1168,56 @@ export async function deleteUserQueue(req: Request, res: Response) {
 export async function getAllSlackUserInfo(_: Request, res: Response) {
   const datas = await Users.findAllSlackUserInfo();
   return res.json(datas);
+}
+
+const viewerUrl: string = process.env.VIEWER_URL
+  ? process.env.VIEWER_URL
+  : 'http://localhost:3000';
+
+export async function newMsgAction(request: Request, response: Response) {
+  if (request.method !== 'POST') {
+    console.error(`Got unsupported ${request.method} request. Expected POST.`);
+    return response.status(405).send('Only POST requests are accepted');
+  }
+  if (!!request.body === false || !!request.body.payload === false) {
+    return response.status(401).send('Bad formatted action response');
+  }
+
+  const action = JSON.parse(request.body.payload) as SlackActionInvocation;
+  const firstAction = action.actions[0];
+
+  const now = new Date();
+  now.setHours(now.getHours() + now.getTimezoneOffset() / -60);
+  const today = now.toJSON().substr(0, 10);
+
+  // po인가?
+  if (firstAction.value === 'cxpo') {
+    response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: `CXPO 등록 완료\n워크로그 주소\n${viewerUrl}/records/${action.user.id}?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+      });
+    return await Groups.addMemberToGroup({
+      group_id: 'cxpo',
+      user_id: action.user.id
+    });
+  }
+
+  // dev인가?
+  if (firstAction.value === 'cxdev') {
+    response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: `CXDEV 등록 완료\n워크로그 주소\n${viewerUrl}/records/${action.user.id}?startDate=${today}&endDate=${today}\n사용법은 팀에서 가이드 할꺼에요~`
+      });
+    return await Groups.addMemberToGroup({
+      group_id: 'cxdev',
+      user_id: action.user.id
+    });
+  }
+  return response.status(201).send({
+    text: '수신 완료'
+  });
 }
