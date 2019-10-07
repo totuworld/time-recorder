@@ -404,6 +404,29 @@ export class WorkLogType {
     await overTimeRef.child(week).set(recordData);
     return recordData;
   }
+
+  /** 정산한 추가근무 기록 삭제 */
+  async deleteOverWorkTime({
+    login_auth_id,
+    week
+  }: {
+    login_auth_id: string;
+    week: string;
+  }) {
+    const overTimeRef = this.OverTimeRef(login_auth_id);
+    // 이미 기록이 있는지 확인.
+    const overWorkRecord = await this.findOverWorkTime({
+      login_auth_id,
+      week
+    });
+    // 기존에 데이터가 있는가?
+    if (!!overWorkRecord === true) {
+      // 삭제하자.
+      await overTimeRef.child(week).remove();
+      return true;
+    }
+    return false;
+  }
   async findOverWorkTime({
     login_auth_id,
     week

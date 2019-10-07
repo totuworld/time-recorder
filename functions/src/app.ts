@@ -36,6 +36,7 @@ import {
   addWorkLog,
   commandHistory,
   commandPing,
+  deleteOverWorkTime,
   deleteUserQueue,
   deleteWorkLog,
   findAllFuseOverTime,
@@ -76,9 +77,7 @@ function routeList() {
       .contentType('json')
       .status(200)
       .send({
-        text: `아래 링크에서 확인하세요 :) \n http://http://cx-joy-work-log-web.gzksfuh6tj.ap-northeast-2.elasticbeanstalk.com/records/${
-          command.user_id
-        }?startDate=${today}&endDate=${today}`
+        text: `아래 링크에서 확인하세요 :) \n http://http://cx-joy-work-log-web.gzksfuh6tj.ap-northeast-2.elasticbeanstalk.com/records/${command.user_id}?startDate=${today}&endDate=${today}`
       });
   });
   router.get('/get_all', getAll);
@@ -110,6 +109,8 @@ function routeList() {
     '/over_works/sync_for_workers',
     updateAllUsersOverWorkTimeTodayWorkker
   ); // 출근 기록을 보유한 전체 사용자 추가 근무 기록 생성
+
+  router.delete('/over_work', deleteOverWorkTime); // 추가 근무 기록 삭제
 
   router.post('/over_work/sync', updateUserOverWorkTime); // 특정 사용자의 추가근무 기록
   router.get('/over_works', findAllOverTime); // 누적된 추가근무시간 목록
