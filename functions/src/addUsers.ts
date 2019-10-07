@@ -112,3 +112,28 @@ export async function addUserByUserID(user_id: string) {
   }
   return false;
 }
+
+export async function addUserByUserEmailID(
+  email_id: string
+): Promise<{ result: boolean; id?: string }> {
+  const info = await client.users.list();
+  if (info.ok) {
+    const members: ISlackUser[] = info.members as ISlackUser[];
+    const user = members.find(fv => fv.profile.email === email_id);
+    if (user) {
+      const findOldData = await Users.findLoginUser({ userUid: user.id });
+      if (findOldData.result === false) {
+        const refRdb = FireabaseAdmin.Database.ref('users');
+        await refRdb.child(user.id).set({
+          id: user.id,
+          email: user.profile.email,
+          name: user.name,
+          real_name: user.real_name,
+          profile_url: user.profile.image_72
+        });
+      }
+      return { result: true, id: user.id };
+    }
+  }
+  return { result: false };
+}

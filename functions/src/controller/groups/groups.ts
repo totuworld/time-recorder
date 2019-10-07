@@ -1,7 +1,7 @@
 import debug from 'debug';
 import { Request, Response } from 'express';
 
-import { addUserByUserID } from '../../addUsers';
+import { addUserByUserEmailID, addUserByUserID } from '../../addUsers';
 import { Groups } from '../../models/Groups';
 import { Users } from '../../models/Users';
 import { Util } from '../../services/util';
@@ -29,15 +29,31 @@ export async function addMemberToGroup(req: Request, res: Response) {
     const userInfo = await Users.find({
       userId: validateReq.data.params.userId
     });
+    let user_slack_id = validateReq.data.params.userId;
     if (!!userInfo === false) {
-      const addUser = await addUserByUserID(validateReq.data.params.userId);
-      if (addUser === false) {
-        return res.status(404).send(false);
+      const slackIdPtn = /^U[A-Z0-9]+/gi;
+      // slack id를 직접 입력한 경우
+      if (slackIdPtn.test(validateReq.data.params.userId)) {
+        const addUser = await addUserByUserID(validateReq.data.params.userId);
+        if (addUser === false) {
+          return res.status(404).send(false);
+        }
+      } else {
+        const email = /@yanolja.com/.test(validateReq.data.params.userId)
+          ? validateReq.data.params.userId
+          : `${validateReq.data.params.userId}@yanolja.com`;
+        const addUserByEmail = await addUserByUserEmailID(email);
+        if (addUserByEmail.result === false) {
+          return res.status(404).send(false);
+        }
+        if (addUserByEmail.id) {
+          user_slack_id = addUserByEmail.id;
+        }
       }
     }
     const result = await Groups.addMemberToGroup({
       group_id: validateReq.data.params.groupId,
-      user_id: validateReq.data.params.userId
+      user_id: user_slack_id
     });
     log('addMemberToGroup result: ', result);
     return res.status(200).send(result);
