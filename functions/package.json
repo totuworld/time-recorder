@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production node lib/server.js",
     "start:local": "NODE_ENV=production node -r dotenv/config lib/server.js",
     "start:debug": "NODE_ENV=production node --inspect-brk=9229 lib/server.js",
+    "start:onlinux": "npm run build && NODE_ENV=production pm2 start lib/server.js -i 2 --name YAWORK_API",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
