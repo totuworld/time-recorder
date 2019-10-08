@@ -291,7 +291,11 @@ export async function addWorkLog(request, res) {
         attachments: [
           {
             title: '바로가기',
-            title_link: `https://yanolja-cx-work-log.now.sh/records/${reqData.user_id}?startDate=${weekStartDay.toFormat('yyyy-LL-dd')}&endDate=${weekEndDay.toFormat('yyyy-LL-dd')}`,
+            title_link: `https://yanolja-cx-work-log.now.sh/records/${
+              reqData.user_id
+            }?startDate=${weekStartDay.toFormat(
+              'yyyy-LL-dd'
+            )}&endDate=${weekEndDay.toFormat('yyyy-LL-dd')}`
           }
         ]
       });
@@ -1109,6 +1113,36 @@ export async function updateAllUsersOverWorkTimeTodayWorkker(
     await promises.pop();
   }
   return response.send();
+}
+
+export async function deleteOverWorkTime(request: Request, response: Response) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/;
+  const { week, user_id, auth_user_id } = request.body;
+  log({ week, auth_user_id });
+  if (Util.isEmpty(week) || weekPtn.test(week) === false) {
+    return response
+      .status(400)
+      .send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+  // user_id나 auth_user_id가 없는가?
+  if (Util.isEmpty(user_id) && Util.isEmpty(auth_user_id)) {
+    return response.status(400).send({
+      errorMessage: '대상 유저가 누구인지 알 수 없음(user_id, auth_user_id)'
+    });
+  }
+  const users = await Users.findAllLoginUser();
+  const targetUser = Util.isNotEmpty(user_id)
+    ? users.find(fv => fv.id === user_id)
+    : users.find(fv => fv.auth_id === auth_user_id);
+  if (targetUser === null || targetUser === undefined) {
+    return response.status(204).send();
+  }
+  log({ targetUser });
+  const result = await WorkLog.deleteOverWorkTime({
+    week,
+    login_auth_id: targetUser.auth_id
+  });
+  return response.json({ result });
 }
 export async function getHolidays(request: Request, response: Response) {
   const { start_date, end_date } = request.query;
