@@ -282,20 +282,45 @@ export async function addWorkLog(request, res) {
       reqData.auth_user_id,
       holidayDuration
     );
-    // 근무 기록이 있고 시간이 - 인지 확인!
-    if (time.haveData === true && time.timeObj.milliseconds < 0) {
+
+    // 근무 기록이 있고 시간이 + or 0이면
+    if (time.haveData === true) {
       await slackClient.chat.postMessage({
         channel: reqData.user_id,
         username: '워크로그',
-        text: '지난주 근무 시간이 부족합니다. 확인해보세요.',
+        text: `한 주도 수고하셨습니다\n근무시간: ${
+          time.convertData.calWorkTimeStr
+        }\n초과시간: ${time.convertData.overTimeStr}\n${
+          time.timeObj.milliseconds < 0
+            ? '근무 시간이 부족하네요. 혹시 누락된 퇴근 기록이 없는지 `근무기록 확인하기`을 통해 살펴보세요.'
+            : ''
+        }`,
         attachments: [
           {
-            title: '바로가기',
+            title: '근무기록 확인하기',
             title_link: `https://yanolja-cx-work-log.now.sh/records/${
               reqData.user_id
             }?startDate=${weekStartDay.toFormat(
               'yyyy-LL-dd'
             )}&endDate=${weekEndDay.toFormat('yyyy-LL-dd')}`
+          },
+          {
+            text: `정산을 진행할까요?${
+              time.timeObj.milliseconds < 0
+                ? '\n정산 버튼을 누르면 설령 근무 시간이 부족해도 정산 됩니다.'
+                : ''
+            }`,
+            fallback: '정산이 진행되지 않았어요.',
+            callback_id: 'wopr_game',
+            color: '#3AA3E3',
+            actions: [
+              {
+                name: 'game',
+                text: `Yes(${lastWeek})`,
+                type: 'button',
+                value: `${lastWeek}`
+              }
+            ]
           }
         ]
       });
@@ -756,21 +781,22 @@ trigger_id: '397118842807.7909278821.7d4790b60fe730f2c4fa229e75848497' }
       .once('value')
       .then(snap => {
         const childData = snap.val() as { [key: string]: LogData };
-        const filter = Object.keys(childData).reduce(
-          (acc: LogData & { key: string }[], key) => {
-            const fv = childData[key] as LogData & { key: string };
-            fv['key'] = key; // 키 저장.
+        const keys = Object.keys(childData);
+        const filter = keys.reduce(
+          (acc: (LogData & { key: string })[], cur) => {
+            const fv = childData[cur];
+            const updateFv: LogData & { key: string } = { ...fv, key: cur };
             // REST, EMERGENCY 중 done이 없는 것 추출
             if (
               (fv.type === EN_WORK_TYPE.REST ||
                 fv.type === EN_WORK_TYPE.EMERGENCY) &&
               !!fv.done === false
             ) {
-              acc.push(fv);
+              acc.push(updateFv);
             }
             return acc;
           },
-          []
+          [] as (LogData & { key: string })[]
         );
         return filter;
       });
@@ -862,9 +888,9 @@ async function getTimeObj(
     'milliseconds'
   );
   if (convertData.overTimeIsMinus === true) {
-    return { haveData, timeObj: { milliseconds: -duration } };
+    return { haveData, timeObj: { milliseconds: -duration }, convertData };
   }
-  return { haveData, timeObj: { milliseconds: duration } };
+  return { haveData, timeObj: { milliseconds: duration }, convertData };
 }
 /** 추가 근무시간 전체 기록 조회 */
 export async function findAllOverTime(request: Request, response: Response) {
@@ -1250,6 +1276,54 @@ export async function newMsgAction(request: Request, response: Response) {
       group_id: 'cxdev',
       user_id: action.user.id
     });
+  }
+
+  if (/^([0-9]{4})-?W(5[0-3]|[1-4][0-9]|0[1-9])$/.test(firstAction.value)) {
+    response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: `${firstAction.value} 정산 시작 👀`
+      });
+    // 해당 주차 정산 요청
+    // 정산 api 콜을 보낸다.
+    const weekStartDay = luxon.DateTime.fromISO(
+      `${firstAction.value}-1`
+    ).minus({ days: 1 });
+    const weekEndDay = luxon.DateTime.fromISO(`${firstAction.value}-6`);
+    // 정산 기록이 없다면. 전체 근무 시간을 확인하자.
+    const [users, holidayDuration] = await Promise.all([
+      Users.findAllLoginUser(),
+      WorkLog.getHolidaysDuration(weekStartDay, weekEndDay)
+    ]);
+    const targetUser = users.find(fv => fv.id === action.user.id);
+    if (targetUser === null || targetUser === undefined) {
+      return response.status(204).send();
+    }
+    const timeObj = await getTimeObj(
+      firstAction.value,
+      action.user.id,
+      targetUser.auth_id,
+      holidayDuration
+    );
+    if (timeObj.haveData === true) {
+      await WorkLog.storeOverWorkTime({
+        login_auth_id: targetUser.auth_id,
+        over_time_obj: timeObj.timeObj,
+        week: firstAction.value
+      });
+      await slackClient.chat.postMessage({
+        channel: action.user.id,
+        username: '워크로그',
+        text: `${firstAction.value} 정산 완료 🏁`,
+        attachments: [
+          {
+            title: '정산기록 확인하기',
+            title_link: `https://yanolja-cx-work-log.now.sh/overload/${action.user.id}`
+          }
+        ]
+      });
+    }
   }
   return response.status(201).send({
     text: '수신 완료'
