@@ -31,6 +31,7 @@ import {
   updateRCEvent
 } from './controller/random_coffee/random_coffee';
 import {
+  addFuseToVacation,
   addFuseWorkLog,
   addUserQueue,
   addWorkLog,
@@ -41,6 +42,7 @@ import {
   deleteWorkLog,
   findAllFuseOverTime,
   findAllFuseOverTimeByUserId,
+  findAllFuseToVacationByUserId,
   findAllOverTime,
   findAllOverTimeByUserId,
   findWeekOverTimeByUserId,
@@ -56,7 +58,8 @@ import {
   storeOverWorkTime,
   updateAllUsersOverWorkTime,
   updateAllUsersOverWorkTimeTodayWorkker,
-  updateUserOverWorkTime
+  updateUserOverWorkTime,
+  useFuseToVacation
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -126,6 +129,13 @@ function routeList() {
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
   router.post('/here_comes_new/:user_slack_id', addUser);
+
+  router.post('/fuse_over_work_to_vacation', addFuseToVacation); // 차감 시간을 휴가로 바꿔서 저장
+  router.get(
+    '/fuse_over_work_to_vacations/:user_id',
+    findAllFuseToVacationByUserId
+  );
+  router.post('/use_fuse_over_work_to_vacation', useFuseToVacation);
 
   router.post('/groups/:groupId/:userId', addMemberToGroup);
   router.delete('/groups/:groupId/:userId', deleteMemberToGroup);

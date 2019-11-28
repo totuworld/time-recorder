@@ -1,19 +1,22 @@
 import debug from 'debug';
 import * as luxon from 'luxon';
 import * as uuid from 'uuid';
+
 import { EN_WORK_TITLE_KR, EN_WORK_TYPE } from '../contants/enum/EN_WORK_TYPE';
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { Util } from '../util';
 import {
+  IOverWorkFindRequest,
   IWorkLogFindRequest,
-  IWorkLogRequest,
-  IOverWorkFindRequest
+  IWorkLogRequest
 } from './interface/IWorkLogRequest';
 import {
-  LogData,
+  IFuseOverWork,
+  IFuseToVacation,
   IOverWork,
-  IFuseOverWork
+  LogData
 } from './interface/SlackSlashCommand';
+
 const log = debug('tr:WorkLogType');
 export class WorkLogType {
   constructor() {
@@ -39,6 +42,11 @@ export class WorkLogType {
     const fuseOverTimeRef = FireabaseAdmin.Database.ref('fuse_over_time');
     return fuseOverTimeRef;
   }
+  /** 차감하여 휴가로만 변경해둔 기록을 저장(firestore) */
+  get FuseToVacation() {
+    const ref = FireabaseAdmin.Firestore.collection('fuse_to_vacation');
+    return ref;
+  }
   get Holiday() {
     const holiDayRef = FireabaseAdmin.Database.ref('public_holiday');
     return holiDayRef;
@@ -52,6 +60,9 @@ export class WorkLogType {
   }
   FuseOverTimeRef(id: string) {
     return this.FuseOverTime.child(id);
+  }
+  FuseToVacationCollection(id: string) {
+    return this.FuseToVacation.doc(id).collection('convert_vacations');
   }
   // #region 저장 기능
   /** 출근 기록 */
@@ -524,6 +535,95 @@ export class WorkLogType {
         return date >= startDate && date <= endDate;
       });
     return values;
+  }
+
+  /** 초과근무시간을 휴가로 바꾼 기록을 남긴다. */
+  async addFuseToVacation({
+    login_auth_id,
+    expireDate,
+    note
+  }: {
+    login_auth_id: string;
+    expireDate: string; // 만료 날짜
+    note: string; // 생성 사유
+  }) {
+    const fuseOverTimeRef = this.FuseToVacationCollection(login_auth_id);
+    /** 기록 남긴 시간 */
+    const created = luxon.DateTime.local().toISO();
+    await fuseOverTimeRef.add({
+      created,
+      expireDate,
+      note,
+      used: false
+    });
+  }
+
+  /** 초과근무시간으로 휴가로 바꾼 것을 사용한다. */
+  async useFuseToVacation({
+    login_auth_id,
+    addLogDate
+  }: {
+    login_auth_id: string;
+    addLogDate: string; // 해당 휴가를 사용한 날짜.
+  }) {
+    const fuseOverTimeRef = this.FuseToVacationCollection(login_auth_id);
+    const possibleDatas = await fuseOverTimeRef
+      .where('used', '==', false)
+      .orderBy('expireDate')
+      .limit(1)
+      .get();
+    if (possibleDatas.size <= 0) {
+      return false;
+    }
+    const id = possibleDatas.docs[0].id;
+    const useTimeStamp = luxon.DateTime.local().toISO();
+    await fuseOverTimeRef
+      .doc(id)
+      .update({ used: true, addLogDate, useTimeStamp });
+    return true;
+  }
+
+  /** 초과근무시간을 휴가로 바꾼 목록 조회 */
+  async findAllFuseToVacation({
+    login_auth_id,
+    expStartDate: startDate,
+    expEndDate: endDate,
+    filterPossible = false
+  }: {
+    login_auth_id: string;
+    expStartDate?: string;
+    expEndDate?: string;
+    filterPossible: boolean;
+  }) {
+    const fuseOverTimeRef = this.FuseToVacationCollection(login_auth_id);
+    const snap = await fuseOverTimeRef.get();
+    const childData = snap.docs.map(mv => {
+      const updateData = {
+        ...mv.data(),
+        key: mv.id
+      } as IFuseToVacation;
+      return updateData;
+    });
+    if (childData === null) {
+      return [];
+    }
+    const returnData = [...childData].filter(fv => {
+      // 사용 가능한 것만 필터링 해야하는가?
+      if (filterPossible === true) {
+        return fv.used;
+      }
+      return true;
+    });
+    // 필터링이 필요한가?
+    if (startDate && endDate) {
+      const sDate = luxon.DateTime.fromISO(startDate);
+      const eDate = luxon.DateTime.fromISO(endDate);
+      return [...returnData].filter(fv => {
+        const fvExpireDate = luxon.DateTime.fromISO(fv.expireDate);
+        return sDate <= fvExpireDate && eDate >= fvExpireDate;
+      });
+    }
+    return returnData;
   }
 }
 export const WorkLog = new WorkLogType();
