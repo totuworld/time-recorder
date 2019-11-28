@@ -64,6 +64,23 @@ export interface IFuseOverWork {
   use: string;
 }
 
+export interface IFuseToVacation {
+  /** 생성 날짜 luxon (yyyyLLdd) */
+  created: string;
+  /** 만료일자 (ISO 8601) */
+  expireDate: string;
+  /** 생성 날짜 */
+  note: string;
+  /** 사용 여부 */
+  used: boolean;
+  /** read시 반환 */
+  key?: string;
+  /** 사용한 시간 */
+  useTimeStamp?: string;
+  /** 해당 휴가를 추가한 날짜 */
+  addLogDate?: string;
+}
+
 export interface IProfile {
   title: string;
   phone: string;
