@@ -1330,6 +1330,99 @@ export async function newMsgAction(request: Request, response: Response) {
   });
 }
 
+const baseDuration = 'PT10H';
+
+/** 특정 팀의 fuse를 vacation으로 전환한다. */
+export async function addFuseToVacationForTeam(
+  request: Request,
+  res: Response
+) {
+  const {
+    ...reqData
+  }: {
+    auth_user_id: string; // 로그인한 auth id
+    expireDate: string; // 만료 날짜
+    note: string; // 사유 같은걸 적을 때 사용
+  } = request.body;
+  const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
+  if (authInfo.result === false) {
+    return res.status(401).send('unauthorized');
+  }
+  const groupId = request.params['groupId'];
+  if (!!groupId === false) {
+    return res
+      .status(400)
+      .contentType('json')
+      .send([]);
+  }
+  const allLoginUsers = await Users.findAllLoginUser();
+  const now = luxon.DateTime.local().toFormat('yyyyLLdd');
+  const resp = await Users.findAllInGroup({ groupId });
+  const successUsers = [];
+  for (const user of resp) {
+    // 사용자 정보 찾기
+    const targetUser = allLoginUsers.find(
+      loginUser => loginUser.id === user.id
+    );
+    if (targetUser === null || targetUser === undefined) {
+      continue;
+    }
+    // 초과근무와 사용한 초과근무 내역 조회
+    // 초과근무 내역 & 사용한 초고근무 시간 내역 조회
+    const [overTime, fuseTime] = await Promise.all([
+      WorkLog.findAllOverWorkTime({ login_auth_id: targetUser.auth_id }),
+      WorkLog.findAllFuseOverWorkTime({ login_auth_id: targetUser.auth_id })
+    ]);
+    if (overTime.length <= 0) {
+      // 기록이 없으면 fail
+      continue;
+    }
+    // 차감을 요청한 시간만큼 전체 시간을 보유했는지 확인한다(현재는 강제룰로 10시간)
+    const fuseDuration = luxon.Duration.fromISO(baseDuration);
+
+    const totalOverWorkDuration = overTime.reduce(
+      (acc: luxon.Duration, cur: IOverWork) => {
+        if (cur.over === null || cur.over === undefined) {
+          return acc;
+        }
+        const tempDuration = luxon.Duration.fromObject(cur.over);
+        const updateAcc = acc.plus(tempDuration);
+        return updateAcc;
+      },
+      luxon.Duration.fromObject({ milliseconds: 0 })
+    );
+    const totalFuseDuration = fuseTime.reduce(
+      (acc: luxon.Duration, cur: IFuseOverWork) => {
+        const tempDuration = luxon.Duration.fromISO(cur.use);
+        const updateAcc = acc.plus(tempDuration);
+        return updateAcc;
+      },
+      luxon.Duration.fromObject({ milliseconds: 0 })
+    );
+    const totalRemainDuration = totalOverWorkDuration.minus(totalFuseDuration);
+    if (fuseDuration > totalRemainDuration) {
+      // 차감 가능 시간을 초과한 요청
+      continue;
+    }
+    // 소진 기록 추가(10시간으로 차감 기록을 남긴다)
+    await WorkLog.addFuseOverWorkTime({
+      login_auth_id: targetUser.auth_id,
+      date: now,
+      use: baseDuration,
+      note: reqData.note
+    });
+
+    // 초과근무를 휴가로 바꾼 기록을 남긴다.
+    await WorkLog.addFuseToVacation({
+      login_auth_id: targetUser.auth_id,
+      expireDate: reqData.expireDate,
+      note: reqData.note
+    });
+    successUsers.push(user);
+  }
+  return res.json(successUsers);
+}
+
 export async function addFuseToVacation(request: Request, res: Response) {
   const {
     ...reqData
@@ -1340,7 +1433,6 @@ export async function addFuseToVacation(request: Request, res: Response) {
     note: string; // 사유 같은걸 적을 때 사용
   } = request.body;
   log(request.body);
-  const baseDuration = 'PT10H';
   // 로그인 사용자 확인
   const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
   if (authInfo.result === false) {
@@ -1495,4 +1587,38 @@ export async function useFuseToVacation(request: Request, res: Response) {
   }
 
   return res.send({ result });
+}
+
+export async function disableExpiredFuseToVacation(
+  request: Request,
+  res: Response
+) {
+  // 그룹 id를 전해받아서 그 안에 있는 사람들을 처리해버리자.
+  const groupId = request.params['group_id'];
+  if (!!groupId === false) {
+    return res.status(400).send();
+  }
+  const groupUsers = await Users.findAllInGroup({ groupId });
+  const allLoginUsers = await Users.findAllLoginUser();
+
+  for (const user of groupUsers) {
+    const targetUser = allLoginUsers.find(fv => fv.id === user.id);
+    // 로그인 유저 정보를 찾을 수 없으면 처리하지 않는다.
+    // auth_id를 찾을 수 없어도 처리하지 않는다.
+    if (
+      targetUser === undefined ||
+      targetUser === null ||
+      targetUser.auth_id === undefined ||
+      targetUser.auth_id === null
+    ) {
+      continue;
+    }
+    const { expireDate, expireNote } = request.body;
+    await WorkLog.disableExpireFuseToVacation({
+      login_auth_id: targetUser.auth_id,
+      expDate: expireDate,
+      expireNote
+    });
+  }
+  return res.send('done');
 }

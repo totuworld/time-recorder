@@ -40,6 +40,7 @@ import {
   deleteOverWorkTime,
   deleteUserQueue,
   deleteWorkLog,
+  disableExpiredFuseToVacation,
   findAllFuseOverTime,
   findAllFuseOverTimeByUserId,
   findAllFuseToVacationByUserId,
@@ -136,6 +137,10 @@ function routeList() {
     findAllFuseToVacationByUserId
   );
   router.post('/use_fuse_over_work_to_vacation', useFuseToVacation);
+  router.put(
+    '/disable_fuse_over_work_to_vacation/:group_id',
+    disableExpiredFuseToVacation
+  ); // 특정 그룹 내의 모든 사용자의 휴가 금고 내에 특정 휴가를 만료처리한다.
 
   router.post('/groups/:groupId/:userId', addMemberToGroup);
   router.delete('/groups/:groupId/:userId', deleteMemberToGroup);
