@@ -75,10 +75,16 @@ export interface IFuseToVacation {
   used: boolean;
   /** read시 반환 */
   key?: string;
+
   /** 사용한 시간 */
   useTimeStamp?: string;
   /** 해당 휴가를 추가한 날짜 */
   addLogDate?: string;
+
+  /** 시스템 만료(혹은 관리자 만료) 사유 */
+  expireNote?: string;
+  /** 시스템 만료(혹은 관리자 만료)가 실행된 시각 */
+  expireByAdminTimeStamp?: string;
 }
 
 export interface IProfile {

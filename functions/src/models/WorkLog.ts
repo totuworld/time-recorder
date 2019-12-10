@@ -625,5 +625,33 @@ export class WorkLogType {
     }
     return returnData;
   }
+
+  /** 특정 사용자의 휴가금고에서 만료일이 지난 휴가를 폭파시킨다. */
+  async disableExpireFuseToVacation({
+    login_auth_id,
+    expDate,
+    expireNote
+  }: {
+    login_auth_id: string;
+    expDate: string;
+    expireNote: string;
+  }) {
+    const fuseOverTimeRef = this.FuseToVacationCollection(login_auth_id);
+    const expireDates = await fuseOverTimeRef
+      .where('expireDate', '<=', expDate)
+      .where('used', '==', false)
+      .get();
+    if (expireDates.size <= 0) {
+      return null;
+    }
+    const batch = FireabaseAdmin.Firestore.batch();
+    const expireByAdminTimeStamp = luxon.DateTime.local().toISO();
+    expireDates.docs.forEach(doc => {
+      batch.update(doc.ref, { used: true, expireNote, expireByAdminTimeStamp });
+    });
+    const resp = await batch.commit();
+    log(resp);
+    return null;
+  }
 }
 export const WorkLog = new WorkLogType();
