@@ -132,16 +132,16 @@ function routeList() {
   router.get('/yotest', addDatas);
   router.post('/here_comes_new/:user_slack_id', addUser);
 
+  router.post(
+    '/fuse_over_work_to_vacation/:group_id',
+    addFuseToVacationByGroupID
+  ); // 특정 그룹 내의 모든 사용자 차감 시간을 휴가로 바꿔서 저장
   router.post('/fuse_over_work_to_vacation', addFuseToVacation); // 차감 시간을 휴가로 바꿔서 저장
   router.get(
     '/fuse_over_work_to_vacations/:user_id',
     findAllFuseToVacationByUserId
   );
   router.post('/use_fuse_over_work_to_vacation', useFuseToVacation);
-  router.post(
-    'fuse_over_work_to_vacation/:group_id',
-    addFuseToVacationByGroupID
-  ); // 특정 그룹 내의 모든 사용자 차감 시간을 휴가로 바꿔서 저장
   router.put(
     '/disable_fuse_over_work_to_vacation/:group_id',
     disableExpiredFuseToVacation

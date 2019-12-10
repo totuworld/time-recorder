@@ -1331,6 +1331,7 @@ export async function newMsgAction(request: Request, response: Response) {
 }
 
 const baseDuration = 'PT10H';
+const baseDurationMS = 60 * 60 * 10 * 1000; // 10시간을 ms로 나타냄.
 
 /** 특정 팀의 fuse를 vacation으로 전환한다. */
 export async function addFuseToVacationForTeam(
@@ -1588,21 +1589,37 @@ export async function addFuseToVacationByGroupID(
       // 차감 가능 시간을 초과한 요청입니다
       continue;
     }
+    // 추가할 휴가 갯수 카운트
+    const totalAddVacationCount = (() => {
+      let nowRemainDuration = luxon.Duration.fromObject(
+        totalRemainDuration.toObject()
+      );
+      let count = 0;
+      while (nowRemainDuration > fuseDuration) {
+        count += 1;
+        nowRemainDuration = nowRemainDuration.minus({
+          milliseconds: baseDurationMS
+        });
+      }
+      return count;
+    })();
     // 소진 기록 추가(10시간으로 차감 기록을 남긴다)
     const now = luxon.DateTime.local().toFormat('yyyyLLdd');
-    await WorkLog.addFuseOverWorkTime({
-      login_auth_id: targetUser.auth_id,
-      date: now,
-      use: baseDuration,
-      note: reqData.note
-    });
+    for (let i = 0; i < totalAddVacationCount; i++) {
+      await WorkLog.addFuseOverWorkTime({
+        login_auth_id: targetUser.auth_id,
+        date: now,
+        use: baseDuration,
+        note: reqData.note
+      });
 
-    // 초과근무를 휴가로 바꾼 기록을 남긴다.
-    await WorkLog.addFuseToVacation({
-      login_auth_id: targetUser.auth_id,
-      expireDate: reqData.expireDate,
-      note: reqData.note
-    });
+      // 초과근무를 휴가로 바꾼 기록을 남긴다.
+      await WorkLog.addFuseToVacation({
+        login_auth_id: targetUser.auth_id,
+        expireDate: reqData.expireDate,
+        note: reqData.note
+      });
+    }
   }
 
   return res.send();
