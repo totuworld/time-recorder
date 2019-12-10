@@ -32,6 +32,7 @@ import {
 } from './controller/random_coffee/random_coffee';
 import {
   addFuseToVacation,
+  addFuseToVacationByGroupID,
   addFuseWorkLog,
   addUserQueue,
   addWorkLog,
@@ -137,6 +138,10 @@ function routeList() {
     findAllFuseToVacationByUserId
   );
   router.post('/use_fuse_over_work_to_vacation', useFuseToVacation);
+  router.post(
+    'fuse_over_work_to_vacation/:group_id',
+    addFuseToVacationByGroupID
+  ); // 특정 그룹 내의 모든 사용자 차감 시간을 휴가로 바꿔서 저장
   router.put(
     '/disable_fuse_over_work_to_vacation/:group_id',
     disableExpiredFuseToVacation
