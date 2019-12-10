@@ -1423,6 +1423,7 @@ export async function addFuseToVacationForTeam(
   return res.json(successUsers);
 }
 
+/** 특정 유저의 초과근무 시간을 휴가금고로 바꿔서 넣음 */
 export async function addFuseToVacation(request: Request, res: Response) {
   const {
     ...reqData
@@ -1506,6 +1507,92 @@ export async function addFuseToVacation(request: Request, res: Response) {
     expireDate: reqData.expireDate,
     note: reqData.note
   });
+
+  return res.send();
+}
+
+export async function addFuseToVacationByGroupID(
+  request: Request,
+  res: Response
+) {
+  const {
+    ...reqData
+  }: {
+    expireDate: string; // 만료 날짜
+    note: string; // 사유 같은걸 적을 때 사용
+  } = request.body;
+  log(request.body);
+
+  // 그룹 id를 전해받아서 그 안에 있는 사람들을 처리해버리자.
+  const groupId = request.params['group_id'];
+  if (!!groupId === false) {
+    return res.status(400).send();
+  }
+
+  // 대상자의 정보를 로딩하자.
+  const groupUsers = await Users.findAllInGroup({ groupId });
+  // 로그인한 사용자 전체 정보를 확인한 뒤 user_id와 매칭되는 것을 찾아야한다. 와 이거 더럽게 복잡한데?
+  const allLoginUsers = await Users.findAllLoginUser();
+
+  for (const user of groupUsers) {
+    const targetUser = allLoginUsers.find(fv => fv.id === user.id);
+    // 사용자가 없는가?
+    if (targetUser === null || targetUser === undefined) {
+      continue;
+    }
+    // 초과근무 내역 & 사용한 초고근무 시간 내역 조회
+    const [overTime, fuseTime] = await Promise.all([
+      WorkLog.findAllOverWorkTime({ login_auth_id: targetUser.auth_id }),
+      WorkLog.findAllFuseOverWorkTime({ login_auth_id: targetUser.auth_id })
+    ]);
+    if (overTime.length <= 0) {
+      // 기록이 없으면 fail
+      // 차감 가능한 초과근무가 없습니다
+      continue;
+    }
+    // 차감을 요청한 시간만큼 전체 시간을 보유했는지 확인한다(현재는 강제룰로 10시간)
+    const fuseDuration = luxon.Duration.fromISO(baseDuration);
+
+    const totalOverWorkDuration = overTime.reduce(
+      (acc: luxon.Duration, cur: IOverWork) => {
+        if (cur.over === null || cur.over === undefined) {
+          return acc;
+        }
+        const tempDuration = luxon.Duration.fromObject(cur.over);
+        const updateAcc = acc.plus(tempDuration);
+        return updateAcc;
+      },
+      luxon.Duration.fromObject({ milliseconds: 0 })
+    );
+    const totalFuseDuration = fuseTime.reduce(
+      (acc: luxon.Duration, cur: IFuseOverWork) => {
+        const tempDuration = luxon.Duration.fromISO(cur.use);
+        const updateAcc = acc.plus(tempDuration);
+        return updateAcc;
+      },
+      luxon.Duration.fromObject({ milliseconds: 0 })
+    );
+    const totalRemainDuration = totalOverWorkDuration.minus(totalFuseDuration);
+    if (fuseDuration > totalRemainDuration) {
+      // 차감 가능 시간을 초과한 요청입니다
+      continue;
+    }
+    // 소진 기록 추가(10시간으로 차감 기록을 남긴다)
+    const now = luxon.DateTime.local().toFormat('yyyyLLdd');
+    await WorkLog.addFuseOverWorkTime({
+      login_auth_id: targetUser.auth_id,
+      date: now,
+      use: baseDuration,
+      note: reqData.note
+    });
+
+    // 초과근무를 휴가로 바꾼 기록을 남긴다.
+    await WorkLog.addFuseToVacation({
+      login_auth_id: targetUser.auth_id,
+      expireDate: reqData.expireDate,
+      note: reqData.note
+    });
+  }
 
   return res.send();
 }
