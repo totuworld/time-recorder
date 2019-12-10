@@ -1520,8 +1520,19 @@ export async function addFuseToVacationByGroupID(
   }: {
     expireDate: string; // 만료 날짜
     note: string; // 사유 같은걸 적을 때 사용
+    auth_id: string;
   } = request.body;
   log(request.body);
+
+  const authInfo = await Users.findLoginUser({ userUid: reqData.auth_id });
+  // 관리자 권한 확인
+  if (
+    authInfo.result === false ||
+    authInfo.data.auth === undefined ||
+    authInfo.data.auth !== 10
+  ) {
+    return res.status(401).send('unauthorized');
+  }
 
   // 그룹 id를 전해받아서 그 안에 있는 사람들을 처리해버리자.
   const groupId = request.params['group_id'];
@@ -1685,6 +1696,16 @@ export async function disableExpiredFuseToVacation(
   if (!!groupId === false) {
     return res.status(400).send();
   }
+  const { expireDate, expireNote, auth_id } = request.body;
+  const authInfo = await Users.findLoginUser({ userUid: auth_id });
+  // 관리자 권한 확인
+  if (
+    authInfo.result === false ||
+    authInfo.data.auth === undefined ||
+    authInfo.data.auth !== 10
+  ) {
+    return res.status(401).send('unauthorized');
+  }
   const groupUsers = await Users.findAllInGroup({ groupId });
   const allLoginUsers = await Users.findAllLoginUser();
 
@@ -1700,7 +1721,6 @@ export async function disableExpiredFuseToVacation(
     ) {
       continue;
     }
-    const { expireDate, expireNote } = request.body;
     await WorkLog.disableExpireFuseToVacation({
       login_auth_id: targetUser.auth_id,
       expDate: expireDate,
