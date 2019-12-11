@@ -30,6 +30,11 @@ const commandSet = {
   EMERGENCY: new Set(['긴급대응', 'ㄱㄱㄷㅇ', 'emergency'])
 };
 const SLACK_ACTION_REQUEST_PING = 'ping-pong';
+
+const viewerUrl: string = process.env.VIEWER_URL
+  ? process.env.VIEWER_URL
+  : 'http://localhost:3000';
+
 const log = debug('tr:functions');
 export async function commandPing(request, response) {
   if (request.method !== 'POST') {
@@ -298,7 +303,7 @@ export async function addWorkLog(request, res) {
         attachments: [
           {
             title: '근무기록 확인하기',
-            title_link: `https://yanolja-cx-work-log.now.sh/records/${
+            title_link: `${viewerUrl}/records/${
               reqData.user_id
             }?startDate=${weekStartDay.toFormat(
               'yyyy-LL-dd'
@@ -1230,10 +1235,6 @@ export async function getAllSlackUserInfo(_: Request, res: Response) {
   return res.json(datas);
 }
 
-const viewerUrl: string = process.env.VIEWER_URL
-  ? process.env.VIEWER_URL
-  : 'http://localhost:3000';
-
 export async function newMsgAction(request: Request, response: Response) {
   if (request.method !== 'POST') {
     console.error(`Got unsupported ${request.method} request. Expected POST.`);
@@ -1319,7 +1320,7 @@ export async function newMsgAction(request: Request, response: Response) {
         attachments: [
           {
             title: '정산기록 확인하기',
-            title_link: `https://yanolja-cx-work-log.now.sh/overload/${action.user.id}`
+            title_link: `${viewerUrl}/overload/${action.user.id}`
           }
         ]
       });
@@ -1620,6 +1621,33 @@ export async function addFuseToVacationByGroupID(
         note: reqData.note
       });
     }
+    await slackClient.chat.postMessage({
+      channel: 'zin_worklog',
+      username: '워크로그',
+      text: `초과근무 --> 휴가금고 변환 완료 🏁`,
+      attachments: [
+        {
+          title: '사용자 id',
+          text: targetUser.id
+        },
+        {
+          title: '변환된 휴가 갯수',
+          text: totalAddVacationCount.toString()
+        },
+        {
+          title: '변환 사유',
+          text: reqData.note
+        },
+        {
+          title: '만료일',
+          text: reqData.expireDate
+        },
+        {
+          title: '휴가금고 확인하기',
+          title_link: `${viewerUrl}/convert_vacation/${targetUser.id}`
+        }
+      ]
+    });
   }
 
   return res.send();
@@ -1742,6 +1770,29 @@ export async function disableExpiredFuseToVacation(
       login_auth_id: targetUser.auth_id,
       expDate: expireDate,
       expireNote
+    });
+    await slackClient.chat.postMessage({
+      channel: 'zin_worklog',
+      username: '워크로그',
+      text: `사리진 휴가금고 안내 😭`,
+      attachments: [
+        {
+          title: '사용자 id',
+          text: targetUser.id
+        },
+        {
+          title: '만료 사유',
+          text: expireNote
+        },
+        {
+          title: '만료 기준일',
+          text: expireDate
+        },
+        {
+          title: '휴가금고 확인하기',
+          title_link: `${viewerUrl}/convert_vacation/${targetUser.id}`
+        }
+      ]
     });
   }
   return res.send('done');
