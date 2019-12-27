@@ -112,6 +112,8 @@ export class TimeRecord {
     endDate: Date,
     holidayDuration?: luxon.Duration
   ) {
+    const min30 = 0.5 * 60 * 60 * 1000;
+    const min60 = min30 * 2;
     const updateDatas =
       value.length > 0
         ? value.map(mv => {
@@ -171,8 +173,11 @@ export class TimeRecord {
       .filter(fv => fv.data.WORK >= 4)
       .map(mv => {
         const extraTime = mv.data.WORK % 4;
-        const lawRestTime =
-          ((mv.data.WORK - extraTime) / 4) * 0.5 * 60 * 60 * 1000;
+        let lawRestTime = ((mv.data.WORK - extraTime) / 4) * min30;
+        // 법정 휴게시간이 1시간을 넘는 경우 무조건 1시간으로 보정한다.
+        if (lawRestTime > min60) {
+          lawRestTime = min60;
+        }
         const updateObj = {
           ...mv.timeObj,
           REST: { milliseconds: lawRestTime }
