@@ -43,6 +43,25 @@ export async function commandPing(request, response) {
   }
   const command = request.body as SlackSlashCommand;
   // console.log(command);
+  if (command.text === 'today') {
+    const today = luxon.DateTime.local();
+    return response
+      .contentType('json')
+      .status(200)
+      .send({
+        text: '🏃‍♀️오늘도 힘내요!',
+        attachments: [
+          {
+            title: '오늘 워크로그 기록 페이지 바로가기',
+            title_link: `${viewerUrl}/records/${
+              command.user_id
+            }?startDate=${today.toFormat(
+              'yyyy-LL-dd'
+            )}&endDate=${today.toFormat('yyyy-LL-dd')}`
+          }
+        ]
+      });
+  }
   // 출근
   if (commandSet.WORK.has(command.text) === true) {
     await WorkLog.storeWork({ userId: command.user_id });
