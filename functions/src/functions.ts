@@ -389,7 +389,7 @@ export async function deleteWorkLog(req, res) {
       login_auth_id: reqData.auth_user_id,
       weekKey: week
     });
-    log('addWorkLog: ', week, data, data === null || data === undefined);
+    log('deleteWorkLog: ', week, data, data === null || data === undefined);
     // 데이터가 있는가?
     if ((data === null || data === undefined) === false) {
       return res.status(401).send('unauthorized(lock)');
@@ -1096,6 +1096,41 @@ export async function updateUserOverWorkTime(
       week
     });
   }
+  return response.send();
+}
+
+export async function forceAddOverWorkTime(
+  request: Request,
+  response: Response
+) {
+  const weekPtn = /[0-9]{4}-W[0-9]{2}/;
+  const { week, user_id, auth_user_id, milliseconds } = request.body;
+  if (Util.isEmpty(week) || weekPtn.test(week) === false) {
+    return response
+      .status(400)
+      .send({ errorMessage: 'body.week는  ISO 8601 규격의 week(2018-W36)' });
+  }
+  // user_id나 auth_user_id가 없는가?
+  if (Util.isEmpty(user_id) && Util.isEmpty(auth_user_id)) {
+    return response.status(400).send({
+      errorMessage: '대상 유저가 누구인지 알 수 없음(user_id, auth_user_id)'
+    });
+  }
+  const [users] = await Promise.all([
+    Users.findAllLoginUser(),
+  ]);
+  const targetUser = Util.isNotEmpty(user_id)
+    ? users.find(fv => fv.id === user_id)
+    : users.find(fv => fv.auth_id === auth_user_id);
+  if (targetUser === null || targetUser === undefined) {
+    return response.status(204).send();
+  }
+  const overTime = luxon.Duration.fromMillis(milliseconds);
+  await WorkLog.storeOverWorkTime({
+    login_auth_id: targetUser.auth_id,
+    over_time_obj: overTime.toObject(),
+    week
+  });
   return response.send();
 }
 export async function updateAllUsersOverWorkTimeTodayWorkker(

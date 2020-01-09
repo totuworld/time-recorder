@@ -61,7 +61,8 @@ import {
   updateAllUsersOverWorkTime,
   updateAllUsersOverWorkTimeTodayWorkker,
   updateUserOverWorkTime,
-  useFuseToVacation
+  useFuseToVacation,
+  forceAddOverWorkTime
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -115,7 +116,9 @@ function routeList() {
     updateAllUsersOverWorkTimeTodayWorkker
   ); // 출근 기록을 보유한 전체 사용자 추가 근무 기록 생성
 
-  router.delete('/over_work', deleteOverWorkTime); // 추가 근무 기록 삭제
+  router.delete('/over_work', deleteOverWorkTime); // 정산한 특정 주간의 정산 기록 삭제
+
+  router.post('/over_work/force_add', forceAddOverWorkTime); // 강제로 특정 주간에 정산 기록을 넣는다.
 
   router.post('/over_work/sync', updateUserOverWorkTime); // 특정 사용자의 추가근무 기록
   router.get('/over_works', findAllOverTime); // 누적된 추가근무시간 목록

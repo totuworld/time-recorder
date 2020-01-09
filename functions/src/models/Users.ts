@@ -1,5 +1,8 @@
 // import debug from "debug";
 import * as luxon from 'luxon';
+
+import { WebClient } from '@slack/client';
+
 import { FireabaseAdmin } from '../services/FirebaseAdmin';
 import { IGroupInfo } from './interface/IGroupInfo';
 import {
@@ -8,7 +11,13 @@ import {
   IUserInfo,
   IUsers
 } from './interface/IUsers';
+import { ISlackUser } from './interface/SlackSlashCommand';
+
 // const log = debug("tr:Users");
+
+const SLACK_TOKEN = process.env.SLACK_TOKEN || 'slack_token';
+const client = new WebClient(SLACK_TOKEN);
+
 export class UsersType {
   private userList: ISlackUserInfo[];
   constructor() {
@@ -112,37 +121,43 @@ export class UsersType {
     return [];
   }
   async addLoginUser({ userUid, email }: { userUid: string; email: string }) {
-    // 전체 사용자 목록 조회.
-    const users = await this.UsersRoot.once('value');
-    const childData = users.val() as { [key: string]: IUserInfo };
-    // 사용자 정보가 있는지 확인.
-    let findUser: IUserInfo | null = null;
-    Object.keys(childData).forEach((key: string) => {
-      const fv = childData[key];
-      if (fv.email === email) {
-        findUser = fv;
-      }
-    });
+    const list = await client.users.list();
     // 사용자가 찾아졌나?
-    if (!!findUser) {
-      const loginUserRef = this.LoginUsersRoot.child(userUid);
-      const snap = await loginUserRef.once('value');
-      const updateValue = snap.val() as ILoginUserInfo;
-      if (!!updateValue === false) {
-        await loginUserRef.set({
-          email,
-          id: findUser.id
+    if (list.ok) {
+      const members: ISlackUser[] = list.members as ISlackUser[];
+      const findUser = members.find(u => u.profile.email === email);
+      if (findUser) {
+        const user: ISlackUser = findUser;
+        const loginUserRef = this.LoginUsersRoot.child(userUid);
+        const snap = await loginUserRef.once('value');
+        const updateValue = snap.val() as ILoginUserInfo;
+        if (!!updateValue === false) {
+          await loginUserRef.set({
+            email,
+            id: user.id
+          });
+        } else {
+          await loginUserRef.update({
+            email,
+            id: user.id
+          });
+        }
+
+        // 정보 저장
+        await this.UsersRoot.child(user.id).set({
+          userUid,
+          id: user.id,
+          email: user.profile.email,
+          name: user.name,
+          real_name: user.real_name,
+          profile_url: user.profile.image_72
         });
-      } else {
-        await loginUserRef.update({
-          email,
-          id: findUser.id
-        });
+
+        return {
+          result: true,
+          userKey: user.id
+        };
       }
-      return {
-        result: true,
-        userKey: findUser.id
-      };
     }
     return {
       result: false,

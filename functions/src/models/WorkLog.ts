@@ -172,10 +172,12 @@ export class WorkLogType {
       /-/gi.test(targetDate) === true
         ? targetDate.replace(/-/gi, '')
         : targetDate;
-    return userRef
+    log(updateTargetDate);
+    log(log_id);
+    await userRef
       .child(updateTargetDate)
       .child(log_id)
-      .set(null);
+      .remove();
   }
   async updateData({
     userId,
