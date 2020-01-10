@@ -306,15 +306,19 @@ export async function addWorkLog(request, res) {
       reqData.auth_user_id,
       holidayDuration
     );
+    const weekWorkingHours = 40 - holidayDuration.hours;
+    const holidayCount = holidayDuration.hours / 8;
 
     // 근무 기록이 있고 시간이 + or 0이면
     if (time.haveData === true) {
       await slackClient.chat.postMessage({
         channel: reqData.user_id,
         username: '워크로그',
-        text: `한 주도 수고하셨습니다\n근무시간: ${
-          time.convertData.calWorkTimeStr
-        }\n초과시간: ${time.convertData.overTimeStr}\n${
+        text: `한 주도 수고하셨습니다
+        \n기준근무시간: ${weekWorkingHours} _(휴일: ${holidayCount})
+        \n근무시간: ${time.convertData.calWorkTimeStr}\n초과시간: ${
+          time.convertData.overTimeStr
+        }\n${
           time.timeObj.milliseconds < 0
             ? '근무 시간이 부족하네요. 혹시 누락된 퇴근 기록이 없는지 `근무기록 확인하기`을 통해 살펴보세요.'
             : ''
@@ -1116,9 +1120,7 @@ export async function forceAddOverWorkTime(
       errorMessage: '대상 유저가 누구인지 알 수 없음(user_id, auth_user_id)'
     });
   }
-  const [users] = await Promise.all([
-    Users.findAllLoginUser(),
-  ]);
+  const [users] = await Promise.all([Users.findAllLoginUser()]);
   const targetUser = Util.isNotEmpty(user_id)
     ? users.find(fv => fv.id === user_id)
     : users.find(fv => fv.auth_id === auth_user_id);
