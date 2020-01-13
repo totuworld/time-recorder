@@ -288,13 +288,10 @@ export async function addWorkLog(request, res) {
     if ((data === null || data === undefined) === false) {
       return res.send();
     }
-    const weekStartDay = luxon.DateTime.local()
-      .set({ weekday: 1 })
-      .minus({ days: 1 })
-      .minus({ week: 1 });
-    const weekEndDay = luxon.DateTime.local()
-      .set({ weekday: 6 })
-      .minus({ week: 1 });
+    const weekStartDay = luxon.DateTime.fromISO(`${lastWeek}-1`).minus({
+      days: 1
+    });
+    const weekEndDay = luxon.DateTime.fromISO(`${lastWeek}-6`);
     // 정산 기록이 없다면. 전체 근무 시간을 확인하자.
     const holidayDuration = await WorkLog.getHolidaysDuration(
       weekStartDay,
@@ -315,6 +312,9 @@ export async function addWorkLog(request, res) {
         channel: reqData.user_id,
         username: '워크로그',
         text: `한 주도 수고하셨습니다
+        \n기간: ${weekStartDay.toFormat('yyyy-LL-dd')} - ${weekEndDay.toFormat(
+          'yyyy-LL-dd'
+        )}
         \n기준근무시간: ${weekWorkingHours} _(휴일: ${holidayCount})
         \n근무시간: ${time.convertData.calWorkTimeStr}\n초과시간: ${
           time.convertData.overTimeStr
@@ -322,7 +322,7 @@ export async function addWorkLog(request, res) {
           time.timeObj.milliseconds < 0
             ? '근무 시간이 부족하네요. 혹시 누락된 퇴근 기록이 없는지 `근무기록 확인하기`을 통해 살펴보세요.'
             : ''
-        }`,
+        }\n누락된 퇴근/재택근무 종료 로그 수: ${time.convertData.noPair}`,
         attachments: [
           {
             title: '근무기록 확인하기',

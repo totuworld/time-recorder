@@ -135,6 +135,10 @@ export class TimeRecord {
                 REMOTE: {},
                 VACATION: {},
                 FUSEOVERLOAD: {}
+              },
+              singleLog: {
+                WORK: 0,
+                REMOTE: 0
               }
             };
             const workTime = TimeRecord.extractWorkTime(mv[dateStr]);
@@ -155,8 +159,14 @@ export class TimeRecord {
             );
             data.data.WORK = workTime.time;
             data.timeObj.WORK = workTime.timeObj;
+            if (workTime.noBye === true) {
+              data.singleLog.WORK += 1;
+            }
             data.data.REMOTE = remoteTime.time;
             data.timeObj.REMOTE = remoteTime.timeObj;
+            if (remoteTime.noBye === true) {
+              data.singleLog.REMOTE += 1;
+            }
             data.data.REST = restTime.time;
             data.timeObj.REST = restTime.timeObj;
             data.data.EMERGENCY = emergencyTime.time;
@@ -265,7 +275,13 @@ export class TimeRecord {
       totalEmergencyTimeStr,
       totalRestTimeStr,
       totalLawRestTimeStr,
-      totalRemoteTimeStr
+      totalRemoteTimeStr,
+      noPair: updateDatas.reduce((acc, cur) => {
+        let updateAcc = acc;
+        updateAcc += cur.singleLog.WORK;
+        updateAcc += cur.singleLog.REMOTE;
+        return updateAcc;
+      }, 0)
     };
   }
   public static checkAddWorkType(logs: LogData[], targetType: EN_WORK_TYPE) {
