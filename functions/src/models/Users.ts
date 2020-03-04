@@ -85,10 +85,10 @@ export class UsersType {
       return this.find({ userId: mv });
     });
     const userInfos = await Promise.all(promises);
-    const memberUserInfos = Object.values(memberList);
+    // const memberUserInfos = Object.values(memberList);
     return userInfos.map(info => {
-      const memberInfo = memberUserInfos.find(fv => fv.id === info.id);
-      return { ...info, ...memberInfo };
+      // const memberInfo = memberUserInfos.find(fv => fv.id === info.id);
+      return { ...info };
     });
   }
 
