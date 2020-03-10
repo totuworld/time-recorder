@@ -689,6 +689,22 @@ export async function getAllGroupInfo(_, response) {
   const resp = await Users.findAllGroupInfo();
   return response.contentType('json').send(resp);
 }
+export async function addGroupInfo(request, response) {
+  const { group_id, name, desc } = request.body;
+  if (Util.isEmpty(group_id) || Util.isEmpty(name) || Util.isEmpty(desc)) {
+    return response.status(400).end();
+  }
+  const resp = await Users.addGroup({ group_id, name, desc });
+  return response.status(resp === true ? 200 : 400).end();
+}
+export async function deleteGroupInfo(request, response) {
+  const { group_id } = request.params;
+  if (Util.isEmpty(group_id)) {
+    return response.status(400).end();
+  }
+  await Users.deleteGroup({ group_id });
+  return response.status(200).end();
+}
 export async function getUser(request, response) {
   const userId = request.query['userId'];
   if (!!userId === false) {

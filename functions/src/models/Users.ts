@@ -120,6 +120,36 @@ export class UsersType {
     }
     return [];
   }
+
+  async addGroup({
+    group_id,
+    name,
+    desc
+  }: {
+    group_id: string;
+    name: string;
+    desc: string;
+  }) {
+    const groupList = await this.findAllGroupInfo();
+    const usedGroupId =
+      groupList.findIndex(fv => fv.group_id === group_id) >= 0;
+    if (usedGroupId) {
+      return false;
+    }
+    const groupInfoRef = this.GroupInfoRoot;
+    await groupInfoRef.child(group_id).set({
+      group_id,
+      desc,
+      name
+    });
+    return true;
+  }
+
+  async deleteGroup({ group_id }: { group_id: string }) {
+    const groupInfoRef = this.GroupInfoRoot;
+    await groupInfoRef.child(group_id).remove();
+  }
+
   async addLoginUser({ userUid, email }: { userUid: string; email: string }) {
     const list = await client.users.list();
     // 사용자가 찾아졌나?

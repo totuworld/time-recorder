@@ -62,7 +62,9 @@ import {
   updateAllUsersOverWorkTimeTodayWorkker,
   updateUserOverWorkTime,
   useFuseToVacation,
-  forceAddOverWorkTime
+  forceAddOverWorkTime,
+  addGroupInfo,
+  deleteGroupInfo
 } from './functions';
 import { SlackSlashCommand } from './models/interface/SlackSlashCommand';
 import { Users } from './models/Users';
@@ -89,6 +91,8 @@ function routeList() {
   router.get('/get_all', getAll);
   router.get('/get_groups', getGroups); // 그룹 안에 멤버를 반환
   router.get('/get_group_infos', getAllGroupInfo); // 그룹의 정보를 조회
+  router.post('/add_group', addGroupInfo); // 그룹 추가
+  router.delete('/delete_group/:group_id', deleteGroupInfo); // 그룹 삭제
   router.get('/get_user', getUser);
   router.post('/message_action', newMsgAction);
   router.post('/update_record', modify);
