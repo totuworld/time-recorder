@@ -137,3 +137,18 @@ export async function addUserByUserEmailID(
   }
   return { result: false };
 }
+
+export async function updateAllLoginUserAddUserUid(_: Request, res: Response) {
+  const allLoginUsers = await Users.findAllLoginUser();
+  const refRdb = FireabaseAdmin.Database.ref('users');
+  const rdb_promises = allLoginUsers.reduce((acc, cur) => {
+    if (!!cur.auth_id) {
+      acc[`/${cur.id}/userUid`] = cur.auth_id;
+    }
+    return acc;
+  }, {});
+  await refRdb.update(rdb_promises);
+  // 사용자 리스트 cache 업데이트
+  await Users.refreshUserList();
+  res.send();
+}

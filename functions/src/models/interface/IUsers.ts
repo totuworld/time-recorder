@@ -23,4 +23,5 @@ export interface ILoginUserInfo {
 
 export interface ISlackUserInfo extends IUserInfo {
   auth_id?: string;
+  userUid?: string;
 }

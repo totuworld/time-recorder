@@ -2,7 +2,7 @@ import * as bodyParser from 'body-parser';
 // express로 사용되는 app
 import express from 'express';
 
-import { addDatas, addUser } from './addUsers';
+import { addDatas, addUser, updateAllLoginUserAddUserUid } from './addUsers';
 import { addBeverage, findAllBeverage } from './controller/beverage/beverage';
 import {
   addEvent,
@@ -113,6 +113,22 @@ function routeList() {
     const findLoginUser = await Users.findLoginUser({ userUid });
     return res.send({ ...findLoginUser });
   });
+  router.put('/active_admin_role/:user_uid', async (req, res) => {
+    const userUid = req.params['user_uid'];
+    if (!!userUid === false) {
+      return res.status(404);
+    }
+    const findLoginUser = await Users.activeAdminRole({ userUid });
+    return res.send({ ...findLoginUser });
+  });
+  router.put('/deactive_admin_role/:user_uid', async (req, res) => {
+    const userUid = req.params['user_uid'];
+    if (!!userUid === false) {
+      return res.status(404);
+    }
+    const findLoginUser = await Users.deActiveAdminRole({ userUid });
+    return res.send({ ...findLoginUser });
+  });
   router.post('/over_work', storeOverWorkTime);
   router.post('/over_works/sync', updateAllUsersOverWorkTime); // 전체 사용자의 추가근무를 기록
   router.post(
@@ -137,6 +153,7 @@ function routeList() {
   router.delete('/get_user/:authId/queue/:key', deleteUserQueue);
   router.get('/slack_users', getAllSlackUserInfo);
   router.get('/yotest', addDatas);
+  router.get('/yoyotest', updateAllLoginUserAddUserUid);
   router.post('/here_comes_new/:user_slack_id', addUser);
 
   router.post(

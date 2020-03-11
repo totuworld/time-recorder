@@ -209,6 +209,42 @@ export class UsersType {
       data: null
     };
   }
+
+  async activeAdminRole({ userUid }: { userUid: string }) {
+    const userRef = this.UsersRoot.child(userUid);
+    const snap = await userRef.once('value');
+    const findUser = snap.val() as ISlackUserInfo;
+    if (!!findUser && !!findUser.userUid) {
+      const updates = {};
+      updates[`/auth`] = 10;
+      // 사용자가 존재하면 권한 부여
+      await this.LoginUsersRoot.child(findUser.userUid).update(updates);
+      return {
+        result: true
+      };
+    }
+    return {
+      result: false
+    };
+  }
+
+  async deActiveAdminRole({ userUid }: { userUid: string }) {
+    const userRef = this.UsersRoot.child(userUid);
+    const snap = await userRef.once('value');
+    const findUser = snap.val() as ISlackUserInfo;
+    if (!!findUser) {
+      await this.LoginUsersRoot.child(findUser.userUid)
+        .child('auth')
+        .remove();
+      return {
+        result: true
+      };
+    }
+    return {
+      result: false
+    };
+  }
+
   async findAllLoginUser() {
     const loginUserRef = this.LoginUsersRoot;
     const snap = await loginUserRef.once('value');
