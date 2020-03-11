@@ -113,16 +113,16 @@ function routeList() {
     const findLoginUser = await Users.findLoginUser({ userUid });
     return res.send({ ...findLoginUser });
   });
-  router.put('/active_admin_role/:user_uid', async (req, res) => {
-    const userUid = req.params['user_uid'];
+  router.put('/active_admin_role/:user_id', async (req, res) => {
+    const userUid = req.params['user_id'];
     if (!!userUid === false) {
       return res.status(404);
     }
     const findLoginUser = await Users.activeAdminRole({ userUid });
     return res.send({ ...findLoginUser });
   });
-  router.put('/deactive_admin_role/:user_uid', async (req, res) => {
-    const userUid = req.params['user_uid'];
+  router.put('/deactive_admin_role/:user_id', async (req, res) => {
+    const userUid = req.params['user_id'];
     if (!!userUid === false) {
       return res.status(404);
     }
