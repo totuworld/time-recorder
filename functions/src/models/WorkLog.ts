@@ -143,12 +143,14 @@ export class WorkLogType {
     type,
     timeStr,
     targetDate,
-    doneStr
+    doneStr,
+    fuseKey
   }: IWorkLogRequest & {
     type: EN_WORK_TYPE;
     timeStr?: string;
     targetDate?: string;
     doneStr?: string;
+    fuseKey?: string;
   }) {
     const time = !!timeStr ? timeStr : Util.currentTimeStamp();
     const done = !!doneStr ? doneStr : null;
@@ -159,6 +161,9 @@ export class WorkLogType {
     const pushObj = { refKey: refKey.key, time, type };
     if (done !== null) {
       pushObj['done'] = done;
+    }
+    if (Util.isNotEmpty(fuseKey)) {
+      pushObj['fuseKey'] = fuseKey;
     }
     await userRef.child(childKey).push(pushObj);
   }
@@ -497,11 +502,23 @@ export class WorkLogType {
     note?: string;
   }) {
     const fuseOverTimeRef = this.FuseOverTimeRef(login_auth_id);
-    await fuseOverTimeRef.push({
+    const newFuseOverWorkTime = fuseOverTimeRef.push();
+    await newFuseOverWorkTime.set({
       date,
       use,
       note
     });
+    return newFuseOverWorkTime.key;
+  }
+  async deleteFuseOverWorkTime({
+    login_auth_id,
+    fuseKey
+  }: {
+    login_auth_id: string;
+    fuseKey: string;
+  }) {
+    const fuseOverTimeRef = this.FuseOverTimeRef(login_auth_id).child(fuseKey);
+    await fuseOverTimeRef.remove();
   }
   async findAllFuseOverWorkTime({
     login_auth_id

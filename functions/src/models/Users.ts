@@ -71,7 +71,7 @@ export class UsersType {
   async find({ userId }: { userId: string }) {
     const user = this.UserInfoRef(userId);
     const snap = await user.once('value');
-    const childData = snap.val() as IUserInfo;
+    const childData = snap.val() as ISlackUserInfo;
     return childData;
   }
 

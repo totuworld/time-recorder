@@ -365,7 +365,9 @@ export async function deleteWorkLog(req, res) {
     user_id: string;
     target_date: string;
     log_id: string;
+    fuseKey?: string;
   } = req.body;
+  const targetUserInfo = await Users.find({ userId: reqData.user_id });
   // 로그인 사용자 확인
   const authInfo = await Users.findLoginUser({ userUid: reqData.auth_user_id });
   if (authInfo.result === false) {
@@ -390,7 +392,7 @@ export async function deleteWorkLog(req, res) {
             .toISOWeekDate()
             .substr(0, 8);
     const data = await WorkLog.findWeekOverWorkTime({
-      login_auth_id: reqData.auth_user_id,
+      login_auth_id: targetUserInfo.userUid,
       weekKey: week
     });
     log('deleteWorkLog: ', week, data, data === null || data === undefined);
@@ -405,6 +407,14 @@ export async function deleteWorkLog(req, res) {
     targetDate: reqData.target_date,
     log_id: reqData.log_id
   });
+  // fuseKey가 있는가?
+  if (!!reqData.fuseKey) {
+    log({ userUid: targetUserInfo.userUid, fuseKey: reqData.fuseKey });
+    await WorkLog.deleteFuseOverWorkTime({
+      login_auth_id: targetUserInfo.userUid,
+      fuseKey: reqData.fuseKey
+    });
+  }
 
   return res.send();
 }
@@ -487,7 +497,7 @@ export async function addFuseWorkLog(request: Request, res: Response) {
   }
   // 사용 기록을 추가한다.
   // 초과근무를 휴가로 사용하는 경우 10시간으로 차감한다.
-  await WorkLog.addFuseOverWorkTime({
+  const fuseKey = await WorkLog.addFuseOverWorkTime({
     login_auth_id: targetUser.auth_id,
     date: reqData.target_date,
     use: isVacation ? 'PT10H' : reqData.duration,
@@ -507,6 +517,7 @@ export async function addFuseWorkLog(request: Request, res: Response) {
     userId: targetUser.id,
     timeStr,
     doneStr,
+    fuseKey,
     targetDate: reqData.target_date,
     type: EN_WORK_TYPE.FUSEOVERLOAD
   });
